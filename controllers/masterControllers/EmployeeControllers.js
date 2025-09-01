@@ -268,23 +268,33 @@ exports.loginEmployee = async (req, res) => {
     }
 
     // 2. Find employee by email
-    const employee = await Employee.findOne({ email: email }); // adjust field name if needed
+    const employee = await Employee.findOne({ email: email });
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // 3. Compare plain password (since not hashing yet)
+    // 3. Check if employee is already logged in
+    if (employee.isCurrentlyLoggedIn) {
+      return res.status(403).json({ message: "Employee is already logged in" });
+    }
+
+    // 4. Compare plain password (since not hashing yet)
     if (employee.password !== password) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // 4. Success
+    // 5. Mark employee as logged in
+    employee.isCurrentlyLoggedIn = true;
+    await employee.save();
+
+    // 6. Success
     res.status(200).json({
       message: "Login successful",
       employee: {
         _id: employee._id,
         name: employee.name,
         email: employee.email,
+        isCurrentlyLoggedIn: employee.isCurrentlyLoggedIn
       },
     });
 
@@ -293,4 +303,31 @@ exports.loginEmployee = async (req, res) => {
     res.status(500).json({ message: "Login failed", error: error.message });
   }
 };
+
+exports.logoutEmployee = async (req, res) => {
+  try {
+    const { email } = req.body; // or get from token/session if you’re using auth
+
+    // 1. Find employee
+    const employee = await Employee.findOne({ email: email });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // 2. Check if already logged out
+    if (!employee.isCurrentlyLoggedIn) {
+      return res.status(400).json({ message: "Employee is already logged out" });
+    }
+
+    // 3. Update login status
+    employee.isCurrentlyLoggedIn = false;
+    await employee.save();
+
+    res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Logout failed", error: error.message });
+  }
+};
+
 

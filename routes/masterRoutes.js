@@ -51,6 +51,7 @@ router.post('/Employee/getAllWorkLocations', EmployeeController.getAllWorkLocati
 router.post('/Employee/getAllRoles', EmployeeController.getAllRoles);
 router.post('/Employee/getAllStatus', EmployeeController.getAllStatus);
 router.post('/Employee/login', EmployeeController.loginEmployee);
+router.post('/Employee/logout', EmployeeController.logoutEmployee);
 
 //Status Routes
 router.post('/Status/createStatus', StatusController.createStatus)
