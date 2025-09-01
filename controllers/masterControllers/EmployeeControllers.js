@@ -1,0 +1,296 @@
+const Employee = require('../../models/masterModels/Employee');
+const Department = require('../../models/masterModels/Department')
+const Designation = require('../../models/masterModels/Designation')
+const Shift = require('../../models/masterModels/Shift')
+const WorkLocation = require('../../models/masterModels/WorkLocation')
+const Role = require('../../models/masterModels/Role')
+const Status = require('../../models/masterModels/Status')
+const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
+const defaultMenus = require('./defaultMenu.json')
+const UserRights = require('../../models/masterModels/UserRights')
+const MenuRegistry = require('../../models/masterModels/MenuRegistry')
+const RoleBased = require("../../models/masterModels/RBAC")
+
+// CREATE Employee
+exports.createEmployee = async (req, res) => {
+  try {
+    const employee = new Employee(req.body);
+    await employee.save();
+    res.status(201).json({ message: "Employee created successfully", employee });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to create employee", error: error.message });
+  }
+};
+
+// GET ALL Employees
+exports.getAllEmployees = async (req, res) => {
+  try {
+    const employees = await Employee.aggregate([
+      // Department
+      {
+        $lookup: {
+          from: "departments",
+          localField: "departmentId",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+
+      // Designation
+      {
+        $lookup: {
+          from: "designations",
+          localField: "designationId",
+          foreignField: "_id",
+          as: "designation"
+        }
+      },
+      { $unwind: { path: "$designation", preserveNullAndEmptyArrays: true } },
+
+      // Role
+      {
+        $lookup: {
+          from: "roles",
+          localField: "roleId",
+          foreignField: "_id",
+          as: "role"
+        }
+      },
+      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
+
+      // Status
+      {
+        $lookup: {
+          from: "status",
+          localField: "statusId",
+          foreignField: "_id",
+          as: "status"
+        }
+      },
+      { $unwind: { path: "$status", preserveNullAndEmptyArrays: true } },
+
+      // Work Location
+      {
+        $lookup: {
+          from: "worklocations",
+          localField: "workLocationId",
+          foreignField: "_id",
+          as: "workLocation"
+        }
+      },
+      { $unwind: { path: "$workLocation", preserveNullAndEmptyArrays: true } },
+
+      // Shift
+      {
+        $lookup: {
+          from: "shifts",
+          localField: "shiftId",
+          foreignField: "_id",
+          as: "shift"
+        }
+      },
+      { $unwind: { path: "$shift", preserveNullAndEmptyArrays: true } },
+
+      // Final projection (include IDs + names)
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          email: 1,
+          password:1,
+          joinDate: 1,
+          salary: 1,
+          avatar: 1,
+          workingHours: 1,
+          lastLoggedIn: 1,
+          isCurrentlyLoggedIn: 1,
+          isActive: 1,
+
+          departmentId: 1,
+          departmentName: "$department.departmentName",
+
+          designationId: 1,
+          designationName: "$designation.designationName",
+
+          roleId: 1,
+          roleName: "$role.RoleName",
+
+          statusId: 1,
+          statusName: "$status.statusName",
+
+          workLocationId: 1,
+          workLocationName: "$workLocation.locationName",
+
+          shiftId: 1,
+          shiftName: "$shift.shiftName"
+        }
+      }
+    ]);
+
+    res.status(200).json(employees);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+// GET ALL Department
+exports.getAllDepartments = async (req, res) => {
+  try {
+    const department = await Department.find();
+    res.status(200).json(department);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET ALL Designation
+exports.getAllDesignations = async (req, res) => {
+  try {
+    const designation = await Designation.find();
+    res.status(200).json(designation);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET ALL Shift
+exports.getAllShifts = async (req, res) => {
+  try {
+    const shift = await Shift.find();
+    res.status(200).json(shift);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET ALL WorkLocation
+exports.getAllWorkLocations = async (req, res) => {
+  try {
+    const workLocation = await WorkLocation.find();
+    res.status(200).json(workLocation);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET ALL Role
+exports.getAllRoles = async (req, res) => {
+  try {
+    const role = await Role.find();
+    res.status(200).json(role);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET ALL Status
+exports.getAllStatus = async (req, res) => {
+  try {
+    const status = await Status.find();
+    res.status(200).json(status);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employees", error: error.message });
+  }
+};
+
+// GET Employee BY ID
+exports.getEmployeeById = async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.body.id); // no populate
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    res.status(200).json(employee);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to get employee", error: error.message });
+  }
+};
+
+// UPDATE Employee
+exports.updateEmployee = async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndUpdate(
+      req.body.id,
+      req.body, // directly from req.body
+      { new: true, runValidators: true }
+    );
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    res.status(200).json({ message: "Employee updated successfully", employee });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to update employee", error: error.message });
+  }
+};
+
+// DELETE Employee
+exports.deleteEmployee = async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndDelete(req.body.id);
+
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    res.status(200).json({ message: "Employee deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to delete employee", error: error.message });
+  }
+};
+
+// LOGIN Employee
+exports.loginEmployee = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1. Reject if request is from mobile device
+    const userAgent = req.headers["user-agent"] || "";
+    const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
+    if (isMobile) {
+      return res.status(403).json({ message: "Login from mobile devices is not allowed" });
+    }
+
+    // 2. Find employee by email
+    const employee = await Employee.findOne({ email: email }); // adjust field name if needed
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // 3. Compare plain password (since not hashing yet)
+    if (employee.password !== password) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    // 4. Success
+    res.status(200).json({
+      message: "Login successful",
+      employee: {
+        _id: employee._id,
+        name: employee.name,
+        email: employee.email,
+      },
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Login failed", error: error.message });
+  }
+};
+
