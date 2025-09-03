@@ -12,11 +12,11 @@ const PermissionRequestSchema = new mongoose.Schema(
       required: true,
     },
     fromTime: {
-      type: String, // e.g., "09:30 AM"
+      type: String, 
       required: true,
     },
     toTime: {
-      type: String, // e.g., "11:00 AM"
+      type: String,
       required: true,
     },
     totalHours: {
@@ -30,13 +30,14 @@ const PermissionRequestSchema = new mongoose.Schema(
     },
     requestedTo: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Employee', // manager or approver
+      ref: 'Employee',
       required: true,
     },
     RequestStatusId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'RequestStatus', // Pending, Approved, Rejected (master table)
-      default: null,
+      ref: "RequestStatus",
+      required: true,
+      default: new mongoose.Types.ObjectId("68b6a2460c502941d03c6367")
     },
     isActive: {
       type: Boolean,

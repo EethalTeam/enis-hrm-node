@@ -7,11 +7,6 @@ const LeaveBalanceSchema = new mongoose.Schema(
       ref: "Employee",
       required: true
     },
-    unitId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Unit",
-      required: true
-    },
     leaveBalances: [
       {
         leaveTypeId: {
@@ -23,7 +18,7 @@ const LeaveBalanceSchema = new mongoose.Schema(
           type: Number,
           required: true
         },
-        used: {
+        remaining: {
           type: Number,
           default: 0
         }

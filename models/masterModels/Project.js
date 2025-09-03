@@ -4,8 +4,6 @@ const ProjectSchema = new mongoose.Schema(
   {
     projectCode: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
     },
     projectName: {
@@ -14,6 +12,10 @@ const ProjectSchema = new mongoose.Schema(
       trim: true,
     },
     description: {
+      type: String,
+      trim: true,
+    },
+    budget: {
       type: String,
       trim: true,
     },
@@ -29,8 +31,7 @@ const ProjectSchema = new mongoose.Schema(
     },
     projectHead: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Employee", // Employee heading the project
-      required: true,
+      ref: "Employee"
     },
     assignedEmployees: [
       {

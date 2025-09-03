@@ -3,6 +3,9 @@ const router = express.Router();
 const LogControllers = require('../controllers/mainControllers/ActivityLogControllers')
 const MenuControllers = require('../controllers/mainControllers/MenuControllers')
 const UserRightsControllers = require('../controllers/mainControllers/UserRightsControllers')
+const ProjectController = require('../controllers/masterControllers/ProjectControllers')
+const TaskController = require('../controllers/masterControllers/TaskControllers')
+const LeaveRequestController = require('../controllers/masterControllers/LeaveRequestControllers')
 
 router.post('/Log/getAllLogs', LogControllers.getAllLogs )
 router.post('/Log/getFilteredLogs', LogControllers.getFilteredLogs )
@@ -22,5 +25,23 @@ router.post('/UserRights/createUserRights', UserRightsControllers.createUserRigh
 router.post('/UserRights/updateUserRights', UserRightsControllers.updateUserRights)
 router.post('/UserRights/getAllMenus', UserRightsControllers.getAllMenus)
 router.post('/UserRights/getAllEmployees', UserRightsControllers.getAllEmployees)
+
+//Project Routes
+router.post('/Project/createProject', ProjectController.createProject)
+router.post('/Project/deleteProject', ProjectController.deleteProject)
+router.post('/Project/updateProject', ProjectController.updateProject)
+router.post('/Project/getAllProjects', ProjectController.getAllProjects)
+
+//Task Routes
+router.post('/Task/createTask', TaskController.createTask)
+router.post('/Task/deleteTask', TaskController.deleteTask)
+router.post('/Task/updateTask', TaskController.updateTask)
+router.post('/Task/getAllTasks', TaskController.getAllTasks)
+
+//LeaveRequest Routes
+router.post('/Leave/createLeave', LeaveRequestController.createLeaveRequest)
+router.post('/Leave/deleteLeave', LeaveRequestController.deleteLeaveRequest)
+router.post('/Leave/updateLeave', LeaveRequestController.updateLeaveRequest)
+router.post('/Leave/getAllLeaves', LeaveRequestController.getAllLeaveRequests)
 
 module.exports = router;

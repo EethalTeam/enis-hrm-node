@@ -9,17 +9,18 @@ const LeaveRequestSchema = new mongoose.Schema(
     },
     leaveTypeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'LeaveType', // Master table for leave types (Sick, Casual, etc.)
+      ref: 'LeaveType',
       required: true
     },
     RequestStatusId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'RequestStatus', // Master table for statuses (Pending, Approved, Rejected)
-      required: true
+      ref: "RequestStatus",
+      required: true,
+      default: new mongoose.Types.ObjectId("68b6a2460c502941d03c6367")
     },
     requestedTo: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Employee', // Who should approve (manager, HR, etc.)
+      ref: 'Employee',
       required: true
     },
     startDate: {

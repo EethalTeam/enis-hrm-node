@@ -11,16 +11,82 @@ const defaultMenus = require('./defaultMenu.json')
 const UserRights = require('../../models/masterModels/UserRights')
 const MenuRegistry = require('../../models/masterModels/MenuRegistry')
 const RoleBased = require("../../models/masterModels/RBAC")
+const LeaveBalance = require("../../models/masterModels/LeaveBalance");
 
-// CREATE Employee
+// CREATE Employee + LeaveBalance
 exports.createEmployee = async (req, res) => {
+  const session = await Employee.startSession();
+  session.startTransaction();
+
   try {
-    const employee = new Employee(req.body);
-    await employee.save();
-    res.status(201).json({ message: "Employee created successfully", employee });
+    const {
+      name,
+      email,
+      password,
+      designationId,
+      departmentId,
+      joinDate,
+      salary,
+      statusId,
+      avatar,
+      workingHours,
+      workLocationId,
+      roleId,
+      shiftId,
+      unitId // required for LeaveBalance
+    } = req.body;
+
+    // ✅ Step 1: Create Employee
+    const employee = new Employee({
+      name,
+      email,
+      password,
+      designationId,
+      departmentId,
+      joinDate,
+      salary,
+      statusId,
+      avatar,
+      workingHours,
+      workLocationId,
+      roleId,
+      shiftId
+    });
+
+    await employee.save({ session });
+
+    // ✅ Step 2: Assign default leave balances using provided IDs
+    const leaveBalances = [
+      { leaveTypeId: "68b6a07021723b01602c4170", totalAllocated: 12, remaining: 12 }, // Annual Leave
+      { leaveTypeId: "68b6a00021723b01602c416b", totalAllocated: 10, remaining: 10 }, // Sick Leave
+      { leaveTypeId: "68b69fee21723b01602c4167", totalAllocated: 12, remaining: 12 }  // Casual Leave
+    ];
+
+    // ✅ Step 3: Save LeaveBalance
+    const newLeaveBalance = new LeaveBalance({
+      employeeId: employee._id,
+      unitId,
+      leaveBalances
+    });
+
+    await newLeaveBalance.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json({
+      message: "Employee created successfully with leave balances",
+      employee,
+      leaveBalance: newLeaveBalance
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to create employee", error: error.message });
+    await session.abortTransaction();
+    session.endSession();
+    console.error("Error creating employee with leave balance:", error);
+    res.status(500).json({
+      message: "Failed to create employee with leave balance",
+      error: error.message
+    });
   }
 };
 
@@ -223,7 +289,7 @@ exports.getEmployeeById = async (req, res) => {
 exports.updateEmployee = async (req, res) => {
   try {
     const employee = await Employee.findByIdAndUpdate(
-      req.body.id,
+      req.body._id,
       req.body, // directly from req.body
       { new: true, runValidators: true }
     );
@@ -268,7 +334,7 @@ exports.loginEmployee = async (req, res) => {
     }
 
     // 2. Find employee by email
-    const employee = await Employee.findOne({ email: email });
+    const employee = await Employee.findOne({ email: email }).populate("roleId", "RoleName");
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -294,6 +360,7 @@ exports.loginEmployee = async (req, res) => {
         _id: employee._id,
         name: employee.name,
         email: employee.email,
+        role:employee.roleId.RoleName,
         isCurrentlyLoggedIn: employee.isCurrentlyLoggedIn
       },
     });

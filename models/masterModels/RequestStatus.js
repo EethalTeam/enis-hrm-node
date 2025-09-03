@@ -4,8 +4,6 @@ const RequestStatusSchema = new mongoose.Schema(
   {
     StatusCode: {
       type: String,
-      required: true,
-      unique: true,
       trim: true
     },
     StatusName: {

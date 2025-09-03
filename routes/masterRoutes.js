@@ -17,6 +17,13 @@ const RBACController = require('../controllers/masterControllers/RBACControllers
 const RoleController = require('../controllers/masterControllers/RoleControllers')
 const LeadController = require('../controllers/masterControllers/LeadControllers')
 const LeadStatusController = require('../controllers/masterControllers/LeadStatusControllers')
+const ProjectStatusController = require('../controllers/masterControllers/ProjectStatusControllers')
+const TaskStatusController = require('../controllers/masterControllers/TaskStatusControllers')
+const TaskPriorityController = require('../controllers/masterControllers/TaskPriorityControllers')
+const LeaveStatusController = require('../controllers/masterControllers/RequestStatusControllers')
+const LeaveTypeController = require('../controllers/masterControllers/LeaveTypeControllers')
+const PermissionController = require('../controllers/masterControllers/PermissionControllers')
+const LeaveBalanceController = require('../controllers/masterControllers/LeaveBalanceControllers')
 
 //Notification 
 
@@ -109,5 +116,48 @@ router.post('/LeadStatus/createLeadStatus', LeadStatusController.createLeadStatu
 router.post('/LeadStatus/deleteLeadStatus', LeadStatusController.deleteLeadStatus)
 router.post('/LeadStatus/updateLeadStatus', LeadStatusController.updateLeadStatus)
 router.post('/LeadStatus/getAllLeadStatus', LeadStatusController.getAllLeadStatus)
+
+//ProjectStatus Routes
+router.post('/ProjectStatus/createProjectStatus', ProjectStatusController.createProjectStatus)
+router.post('/ProjectStatus/deleteProjectStatus', ProjectStatusController.deleteProjectStatus)
+router.post('/ProjectStatus/updateProjectStatus', ProjectStatusController.updateProjectStatus)
+router.post('/ProjectStatus/getAllProjectStatus', ProjectStatusController.getAllProjectStatus)
+
+//TaskStatus Routes
+router.post('/TaskStatus/createTaskStatus', TaskStatusController.createTaskStatus)
+router.post('/TaskStatus/deleteTaskStatus', TaskStatusController.deleteTaskStatus)
+router.post('/TaskStatus/updateTaskStatus', TaskStatusController.updateTaskStatus)
+router.post('/TaskStatus/getAllTaskStatus', TaskStatusController.getAllTaskStatus)
+
+//TaskPriority Routes
+router.post('/TaskPriority/createTaskPriority', TaskPriorityController.createTaskPriority)
+router.post('/TaskPriority/deleteTaskPriority', TaskPriorityController.deleteTaskPriority)
+router.post('/TaskPriority/updateTaskPriority', TaskPriorityController.updateTaskPriority)
+router.post('/TaskPriority/getAllTaskPriority', TaskPriorityController.getAllTaskPriority)
+
+//LeaveStatus Routes
+router.post('/LeaveStatus/createLeaveStatus', LeaveStatusController.createRequestStatus)
+router.post('/LeaveStatus/deleteLeaveStatus', LeaveStatusController.deleteRequestStatus)
+router.post('/LeaveStatus/updateLeaveStatus', LeaveStatusController.updateRequestStatus)
+router.post('/LeaveStatus/getAllLeaveStatus', LeaveStatusController.getAllRequestStatus)
+
+//LeaveType Routes
+router.post('/LeaveType/createLeaveType', LeaveTypeController.createLeaveType)
+router.post('/LeaveType/deleteLeaveType', LeaveTypeController.deleteLeaveType)
+router.post('/LeaveType/updateLeaveType', LeaveTypeController.updateLeaveType)
+router.post('/LeaveType/getAllLeaveType', LeaveTypeController.getAllLeaveType)
+
+//Permission Routes
+router.post('/Permission/createPermission', PermissionController.createPermissionRequest)
+router.post('/Permission/deletePermission', PermissionController.deletePermissionRequest)
+router.post('/Permission/updatePermission', PermissionController.updatePermissionRequest)
+router.post('/Permission/getAllPermissions', PermissionController.getAllPermissionRequests)
+router.post('/Permission/updatePermissionStatus', PermissionController.updatePermissionStatus)
+
+//LeaveBalance Routes
+router.post('/LeaveBalance/createLeaveBalance', LeaveBalanceController.createLeaveBalance)
+router.post('/LeaveBalance/deleteLeaveBalance', LeaveBalanceController.deleteLeaveBalance)
+router.post('/LeaveBalance/updateLeaveBalance', LeaveBalanceController.updateLeaveBalance)
+router.post('/LeaveBalance/getAllLeaveBalances', LeaveBalanceController.getAllLeaveBalances)
 
 module.exports = router;
