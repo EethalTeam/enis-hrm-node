@@ -52,7 +52,7 @@ exports.updateLeadStatus = async (req, res) => {
     const { _id } = req.body;
     if (!mongoose.Types.ObjectId.isValid(_id)) return res.status(400).json({ message: 'Invalid ID' });
 
-    const updatedLeadStatus = await LeadStatus.findByIdAndUpdate(id, req.body, { new: true });
+    const updatedLeadStatus = await LeadStatus.findByIdAndUpdate(_id, req.body, { new: true });
     if (!updatedLeadStatus) return res.status(404).json({ message: 'Lead Status not found' });
 
     res.status(200).json({ message: 'Lead Status updated successfully', leadStatus: updatedLeadStatus });

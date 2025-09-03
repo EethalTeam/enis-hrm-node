@@ -46,12 +46,16 @@ exports.createTask = async (req, res) => {
 // ✅ Get All Tasks
 exports.getAllTasks = async (req, res) => {
   try {
-    const tasks = await Task.find()
+    const {_id,role}= req.body;
+    let filter={}
+    if(role !== 'Super Admin' && role !== 'Admin'){
+      filter.assignedTo = _id
+    }
+    const tasks = await Task.find(filter)
       .populate("projectId", "projectName projectCode")
       .populate("taskStatusId", "name")
       .populate("taskPriorityId", "name")
       .populate("assignedTo", "name email")
-
     res.status(200).json(tasks);
   } catch (error) {
     console.error("Get All Tasks Error:", error);
@@ -111,6 +115,59 @@ exports.updateTask = async (req, res) => {
     res.status(200).json({ message: "Task updated successfully", task });
   } catch (error) {
     console.error("Update Task Error:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+exports.updateTaskStatus = async (req, res) => {
+  try {
+    const { taskId, status, feedback, progressDetails, reasonForPending } = req.body;
+
+    if (!taskId || !status) {
+      return res.status(400).json({ message: "Task ID and status are required" });
+    }
+
+    // Mapping status to TaskStatus IDs
+    const statusMap = {
+      Start: { id: "68b5a26288e62ec178bb2927", message: "Task Started" },     // In Progress
+      Pause: { id: "68b5a25b88e62ec178bb2923", message: "Task Paused" },      // To Do
+      Complete: { id: "68b5a26d88e62ec178bb292b", message: "Task Completed" } // Completed
+    };
+
+    const selectedStatus = statusMap[status];
+
+    if (!selectedStatus) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    // Build update object
+    const updateObj = { taskStatusId: selectedStatus.id };
+    
+    if (feedback) updateObj.feedback = feedback;
+
+    const pushObj = {};
+    if (progressDetails) pushObj.progressDetails = progressDetails;
+    if (reasonForPending) pushObj.reasonForPending = reasonForPending;
+    
+    if (Object.keys(pushObj).length > 0) {
+      updateObj.$push = pushObj;
+    }
+
+    const task = await Task.findByIdAndUpdate(taskId, updateObj, { new: true })
+      .populate("projectId", "projectName")
+      .populate("taskStatusId", "name")
+      .populate("assignedTo", "name email");
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.status(200).json({
+      message: selectedStatus.message,
+      task,
+    });
+  } catch (error) {
+    console.error("Update Task Status Error:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };

@@ -39,10 +39,11 @@ statusId:new mongoose.Types.ObjectId(statusId)});
 // Get all Leads (with optional filtering by isActive)
 exports.getAllLeads = async (req, res) => {
   try {
-    const { isActive } = req.query; // optional filter
+     const {_id,role}= req.body;
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
-
+     if(role !== 'Super Admin' && role !== 'Admin'){
+      filter.assignedTo = _id
+    }
     const leads = await Lead.find(filter)
       .populate('statusId', 'statusName')
       .populate('assignedTo', 'name');

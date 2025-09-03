@@ -37,6 +37,7 @@ router.post('/Task/createTask', TaskController.createTask)
 router.post('/Task/deleteTask', TaskController.deleteTask)
 router.post('/Task/updateTask', TaskController.updateTask)
 router.post('/Task/getAllTasks', TaskController.getAllTasks)
+router.post('/Task/updateTaskStatus', TaskController.updateTaskStatus)
 
 //LeaveRequest Routes
 router.post('/Leave/createLeave', LeaveRequestController.createLeaveRequest)

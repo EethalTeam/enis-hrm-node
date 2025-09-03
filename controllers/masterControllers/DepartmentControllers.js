@@ -45,9 +45,10 @@ exports.getDepartmentById = async (req, res) => {
 // UPDATE Department
 exports.updateDepartment = async (req, res) => {
   try {
+    const {_id,departmentHead,departmentName} = req.body
     const department = await Department.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+      _id,
+      {departmentHead,departmentName},
       { new: true, runValidators: true }
     ).populate("departmentHead", "name email");
 

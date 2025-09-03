@@ -44,6 +44,24 @@ const TaskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
     },
+
+    // New fields
+    feedback: {
+      type: String,
+      trim: true,
+    },
+    progressDetails: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    reasonForPending: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   { timestamps: true }
 );
