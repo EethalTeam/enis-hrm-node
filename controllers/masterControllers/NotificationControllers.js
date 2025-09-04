@@ -1,5 +1,8 @@
 const Notification = require("../../models/masterModels/Notifications");
 const Group = require("../../models/masterModels/Group"); // Your group schema
+const LeaveRequest = require("../../models/masterModels/LeaveRequest");
+const PermissionRequest = require("../../models/masterModels/Permissions");
+const mongoose = require('mongoose');
 
 // Create a notification
 exports.createNotification = async (req, res) => {
@@ -103,6 +106,10 @@ exports.markAsSeen = async (req, res) => {
       { new: true }
     );
 
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found." });
+    }
+
     res.status(200).json({
       message: "Notification marked as seen.",
       data: notification,
@@ -115,3 +122,73 @@ exports.markAsSeen = async (req, res) => {
     });
   }
 };
+
+exports.updateNotificationStatus = async (req, res) => {
+  try {
+    const { notificationId, action } = req.body;
+    const io = req.app.get("socketio"); // ✅ get socket instance
+    if (!notificationId || !action) {
+      return res.status(400).json({ message: "notificationId and action are required." });
+    }
+
+    const STATUS = {
+      approved: "68b6a2610c502941d03c6372",
+      rejected: "68b6a2680c502941d03c6376"
+    };
+
+    const newStatus = action === "approve" ? "approved" : "rejected";
+
+    // ✅ Update notification status
+    const notification = await Notification.findByIdAndUpdate(
+      notificationId,
+      { status: newStatus },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found." });
+    }
+
+    // ✅ If notification is for Leave Request
+    if (notification.type === "leave-request" && notification.meta?.leaveRequestId) {
+      await LeaveRequest.findByIdAndUpdate(
+        notification.meta.leaveRequestId,
+        { RequestStatusId: STATUS[newStatus] },
+        { new: true }
+      );
+    }
+
+    // ✅ If notification is for Permission Request
+    if (notification.type === "permission-request" && notification.meta?.permissionRequestId) {
+      await PermissionRequest.findByIdAndUpdate(
+        notification.meta.permissionRequestId,
+        { RequestStatusId: STATUS[newStatus] },
+        { new: true }
+      );
+    }
+
+    const Newnotification = new Notification({
+      message:`Your ${notification.type} has been ${newStatus}`,
+      type: "general",
+      fromEmployeeId:notification.toEmployeeId,
+      toEmployeeId: notification.fromEmployeeId || null,
+      groupId:null,
+      status: "unseen",
+      meta: {},
+    });
+
+    await Newnotification.save();
+  io.to(notification.fromEmployeeId.toString()).emit("receiveNotification", Newnotification);
+    res.status(200).json({
+      message: `Notification and related request updated to ${newStatus}`,
+      data: notification,
+    });
+  } catch (error) {
+    console.error("Error updating notification:", error.message);
+    res.status(500).json({
+      message: "Failed to update notification.",
+      error: error.message,
+    });
+  }
+};
+

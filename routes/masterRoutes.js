@@ -29,6 +29,8 @@ const LeaveBalanceController = require('../controllers/masterControllers/LeaveBa
 
 router.post("/Notifications/createNotifications", NotificationController.createNotification);
 router.post("/Notifications/getNotifications", NotificationController.getNotificationsByEmployee);
+router.post("/Notifications/updateNotificationStatus", NotificationController.updateNotificationStatus);
+router.post("/Notifications/markAsSeen", NotificationController.markAsSeen);
 
 
 //********* Login ***************************** */

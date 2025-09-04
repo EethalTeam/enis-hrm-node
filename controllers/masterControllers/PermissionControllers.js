@@ -1,12 +1,14 @@
 // controllers/permissionRequestController.js
 const PermissionRequest = require("../../models/masterModels/Permissions");
 const RequestStatus = require("../../models/masterModels/RequestStatus")
+const Notification = require("../../models/masterModels/Notifications");
 
 // CREATE - Add new permission request
 exports.createPermissionRequest = async (req, res) => {
   try {
     const {
       employeeId,
+      employee,
       permissionDate,
       fromTime,
       toTime,
@@ -16,6 +18,7 @@ exports.createPermissionRequest = async (req, res) => {
       isActive
     } = req.body;
 
+    // Create the permission request
     const newRequest = new PermissionRequest({
       employeeId,
       permissionDate,
@@ -27,9 +30,31 @@ exports.createPermissionRequest = async (req, res) => {
       isActive
     });
 
-    await newRequest.save();
-    res.status(201).json({ success: true, data: newRequest });
+    const savedRequest = await newRequest.save();
+
+    // Create notification for the requestedTo employee
+    const notification = new Notification({
+      toEmployeeId: requestedTo,
+      fromEmployeeId: employeeId,
+      message: `New permission request from employee`,
+       message: `New permission request from ${employee} for about ${totalHours} ${totalHours > 1 ? "hours" : "hour"} from ${fromTime}
+      to ${toTime} for ${reason} on ${permissionDate}`,
+      type: "permission-request",
+      status: "unseen",
+      meta: { permissionRequestId: savedRequest._id }
+    });
+
+    const savedNotification = await notification.save();
+
+    // Emit live notification via socket
+    const io = req.app.get("socketio"); // Get socket.io instance from app
+    if (io) {
+      io.to(requestedTo.toString()).emit("receiveNotification", savedNotification);
+    }
+
+    res.status(201).json({ success: true, data: savedRequest, notification: savedNotification });
   } catch (error) {
+    console.error("Error creating permission request:", error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 };

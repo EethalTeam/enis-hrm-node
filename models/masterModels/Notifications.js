@@ -45,8 +45,8 @@ const notificationSchema = new mongoose.Schema(
       default: "unseen",
     },
     meta: {
-      leaveId: { type: mongoose.Schema.Types.ObjectId, ref: "Leave" },
-      permissionId: { type: mongoose.Schema.Types.ObjectId, ref: "Permission" },
+      leaveRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "Leave" },
+      permissionRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "Permission" },
       taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
     },
   },

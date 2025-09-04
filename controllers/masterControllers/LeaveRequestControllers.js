@@ -32,11 +32,10 @@ exports.createLeaveRequest = async (req, res) => {
     });
 
     const savedRequest = await leaveRequest.save();
-
     // 2️⃣ Create a notification for the approver
     const notification = await Notification.create({
       type: "leave-request",
-      message: `New ${leaveType} request from (${employee}) for about ${totalDays} ${totalDays > 1 ? "days" : "day"} from ${startDate}
+      message: `New ${leaveType} request from ${employee} for about ${totalDays} ${totalDays > 1 ? "days" : "day"} from ${startDate}
       to ${endDate} for ${reason}`,
       fromEmployeeId: employeeId,
       toEmployeeId: requestedToId,
@@ -45,7 +44,6 @@ exports.createLeaveRequest = async (req, res) => {
         leaveRequestId: savedRequest._id
       }
     });
-
     // 3️⃣ Emit notification via Socket.IO
     const io = req.app.get("socketio");
     if (io && requestedToId) {
