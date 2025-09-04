@@ -20,6 +20,7 @@ exports.createEmployee = async (req, res) => {
 
   try {
     const {
+      code,
       name,
       email,
       password,
@@ -38,6 +39,7 @@ exports.createEmployee = async (req, res) => {
 
     // ✅ Step 1: Create Employee
     const employee = new Employee({
+      code,
       name,
       email,
       password,
@@ -164,6 +166,7 @@ exports.getAllEmployees = async (req, res) => {
       {
         $project: {
           _id: 1,
+          code:1,
           name: 1,
           email: 1,
           password:1,
@@ -358,6 +361,7 @@ exports.loginEmployee = async (req, res) => {
       message: "Login successful",
       employee: {
         _id: employee._id,
+        employeeCode:employee.code,
         name: employee.name,
         email: employee.email,
         role:employee.roleId.RoleName,

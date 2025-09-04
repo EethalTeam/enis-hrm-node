@@ -1,12 +1,14 @@
 // controllers/leaveRequestController.js
 const LeaveRequest = require("../../models/masterModels/LeaveRequest");
+const Notification = require('../../models/masterModels/Notifications')
 
-// ✅ Create Leave Request
 exports.createLeaveRequest = async (req, res) => {
   try {
     const {
       employeeId,
       leaveTypeId,
+      employee,
+      leaveType,
       requestedToId,
       startDate,
       endDate,
@@ -18,10 +20,11 @@ exports.createLeaveRequest = async (req, res) => {
       return res.status(400).json({ message: "All required fields must be provided" });
     }
 
+    // 1️⃣ Save leave request
     const leaveRequest = new LeaveRequest({
       employeeId,
       leaveTypeId,
-      requestedTo:requestedToId,
+      requestedTo: requestedToId,
       startDate,
       endDate,
       totalDays,
@@ -29,8 +32,33 @@ exports.createLeaveRequest = async (req, res) => {
     });
 
     const savedRequest = await leaveRequest.save();
-    res.status(201).json({ message: "Leave request created successfully", data: savedRequest });
+
+    // 2️⃣ Create a notification for the approver
+    const notification = await Notification.create({
+      type: "leave-request",
+      message: `New ${leaveType} request from (${employee}) for about ${totalDays} ${totalDays > 1 ? "days" : "day"} from ${startDate}
+      to ${endDate} for ${reason}`,
+      fromEmployeeId: employeeId,
+      toEmployeeId: requestedToId,
+      status: "unseen",
+      meta: {
+        leaveRequestId: savedRequest._id
+      }
+    });
+
+    // 3️⃣ Emit notification via Socket.IO
+    const io = req.app.get("socketio");
+    if (io && requestedToId) {
+      io.to(requestedToId.toString()).emit("receiveNotification", notification);
+    }
+
+    res.status(201).json({
+      message: "Leave request created successfully",
+      data: savedRequest
+    });
+
   } catch (error) {
+    console.error("Error creating leave request:", error.message);
     res.status(500).json({ message: "Error creating leave request", error: error.message });
   }
 };

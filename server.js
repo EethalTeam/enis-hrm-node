@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const masterRoutes = require('./routes/masterRoutes');
 const mainRoutes = require('./routes/mainRoutes');
 const Notification = require('./models/masterModels/Notifications');
+const Group = require('./models/masterModels/Group');
 
 const app = express();
 const PORT = 8001;
@@ -33,29 +34,93 @@ const io = new Server(server, {
   }
 });
 
+app.set("socketio", io);
+
 io.on("connection", (socket) => {
   console.log("⚡ A client connected:", socket.id);
 
-  socket.on("joinRoom", ({ unitId }) => {
-    socket.join(unitId);
-    console.log(`Socket ${socket.id} joined room: ${unitId}`);
+  // Employee joins their own room
+  socket.on("joinRoom", ({ employeeId }) => {
+    socket.employeeId = employeeId;
+    socket.join(employeeId);
+    console.log(`Socket ${socket.id} joined room: ${employeeId}`);
   });
 
-  socket.on("sendMessage", async ({ toUnitId, message }) => {
-    io.to(toUnitId).emit("receiveMessage", message);
-try { 
-    await Notification.create({
-      unitId: toUnitId,
-      message,
-    });
-  } catch (err) {
-    console.error("❌ Error saving notification:", err.message);
-  }
-});
+  // Handle sending messages / notifications
+  socket.on("sendMessage", async ({ type, message, toEmployeeId = null, groupId = null, meta = {} }) => {
+    try {
+      // Use the centralized function
+      const notification = await createNotification({
+        type,
+        message,
+        fromEmployeeId: socket.employeeId,
+        toEmployeeId,
+        groupId,
+        meta,
+      });
+
+      console.log("✅ Notification created:", notification._id);
+    } catch (err) {
+      console.error("❌ Error sending notification:", err.message);
+    }
+  });
 
   socket.on("disconnect", () => {
+    console.log(`❌ Employee ${socket.employeeId || socket.id} disconnected`);
   });
-})
+});
+const createNotification = async ({ 
+  type, 
+  message, 
+  fromEmployeeId, 
+  toEmployeeId = null, 
+  groupId = null, 
+  meta = {} 
+}) => {
+  try {
+    // Build notification object
+    const notificationData = {
+      type,
+      message,
+      fromEmployeeId,
+      toEmployeeId,
+      groupId,
+      meta,
+    };
+
+    // Set default status based on type
+    if (type === "leave-request" || type === "permission-request") {
+      notificationData.status = "unseen"; // pending approval
+    } else if (type === "chat-message" || type === "group-chat-message") {
+      notificationData.status = "unseen"; // unread message
+    } else {
+      notificationData.status = "seen"; // announcements, system alerts, etc.
+    }
+
+    // Create notification in DB
+    const notification = await Notification.create(notificationData);
+
+    // Emit via socket if employee or group online
+    if (toEmployeeId) {
+      // Individual notification
+      io.to(toEmployeeId.toString()).emit("receiveNotification", notification);
+    } else if (groupId) {
+      // Group notification: emit to all members except sender
+      const group = await Group.findById(groupId).populate("members", "_id");
+      group.members.forEach(member => {
+        if (member._id.toString() !== fromEmployeeId.toString()) {
+          io.to(member._id.toString()).emit("receiveNotification", notification);
+        }
+      });
+    }
+
+    return notification;
+
+  } catch (err) {
+    console.error("❌ Error creating notification:", err.message);
+    throw err;
+  }
+};
 
 // MongoDB Connection
 async function main() {
