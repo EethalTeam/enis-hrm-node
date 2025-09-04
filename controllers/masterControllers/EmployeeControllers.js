@@ -361,7 +361,7 @@ exports.loginEmployee = async (req, res) => {
       message: "Login successful",
       employee: {
         _id: employee._id,
-        employeeCode:employee.code,
+        employeeCode:employee.code?employee.code :'',
         name: employee.name,
         email: employee.email,
         role:employee.roleId.RoleName,
