@@ -1,5 +1,6 @@
 // controllers/taskController.js
 const Task = require("../../models/masterModels/Task");
+const Notification = require('../../models/masterModels/Notifications')
 
 // ✅ Create Task
 exports.createTask = async (req, res) => {
@@ -36,6 +37,23 @@ exports.createTask = async (req, res) => {
     });
 
     await task.save();
+
+        // 2️⃣ Create a notification for the approver
+        const notification = await Notification.create({
+          type: "task-assignment",
+          message: "New task is assigned for you",
+          fromEmployeeId: createdBy,
+          toEmployeeId: assignedTo,
+          status: "unseen",
+          meta: {
+            taskId: task._id
+          }
+        });
+        // 3️⃣ Emit notification via Socket.IO
+        const io = req.app.get("socketio");
+        if (io && assignedTo) {
+          io.to(assignedTo.toString()).emit("receiveNotification", notification);
+        }
     res.status(201).json({ message: "Task created successfully", task });
   } catch (error) {
     console.error("Create Task Error:", error);

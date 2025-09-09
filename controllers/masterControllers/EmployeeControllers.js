@@ -401,4 +401,35 @@ exports.logoutEmployee = async (req, res) => {
   }
 };
 
+exports.logoutUser = async (employeeId) => {
+  try {
+    // Update lastActive or any other logout tracking if needed
+    await Employee.findByIdAndUpdate(employeeId, { isCurrentlyLoggedIn: false });
+
+  } catch (err) {
+    console.error("❌ Error logging out user:", err.message);
+  }
+};
+
+exports.checkLogin = async (req, res, next) => {
+  try {
+    const userId = req.headers["x-user-id"]; // userId passed from frontend
+    if (!userId) {
+      return res.status(401).json({ message: "User ID missing" });
+    }
+
+    const user = await Employee.findById(userId);
+
+    if (!user || !user.isCurrentlyLoggedIn) {
+      return res.status(401).json({ message: "User not logged in" });
+    }
+
+    // ✅ User is valid and logged in
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error("checkLogin error:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 

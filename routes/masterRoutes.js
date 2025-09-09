@@ -24,6 +24,8 @@ const LeaveStatusController = require('../controllers/masterControllers/RequestS
 const LeaveTypeController = require('../controllers/masterControllers/LeaveTypeControllers')
 const PermissionController = require('../controllers/masterControllers/PermissionControllers')
 const LeaveBalanceController = require('../controllers/masterControllers/LeaveBalanceControllers')
+const AttendanceController = require('../controllers/masterControllers/AttendanceControllers')
+const HolidayController = require('../controllers/masterControllers/HolidayControllers')
 
 //Notification 
 
@@ -34,7 +36,7 @@ router.post("/Notifications/markAsSeen", NotificationController.markAsSeen);
 
 
 //********* Login ***************************** */
-router.post('/Auth/login', LoginController.verifyLogin);
+// router.post('/Auth/login', LoginController.verifyLogin);
 
 //********************Department routers ********************** */
 
@@ -59,8 +61,8 @@ router.post('/Employee/getAllShifts', EmployeeController.getAllShifts);
 router.post('/Employee/getAllWorkLocations', EmployeeController.getAllWorkLocations);
 router.post('/Employee/getAllRoles', EmployeeController.getAllRoles);
 router.post('/Employee/getAllStatus', EmployeeController.getAllStatus);
-router.post('/Employee/login', EmployeeController.loginEmployee);
-router.post('/Employee/logout', EmployeeController.logoutEmployee);
+// router.post('/Employee/login', EmployeeController.loginEmployee);
+// router.post('/Employee/logout', EmployeeController.logoutEmployee);
 
 //Status Routes
 router.post('/Status/createStatus', StatusController.createStatus)
@@ -161,5 +163,18 @@ router.post('/LeaveBalance/createLeaveBalance', LeaveBalanceController.createLea
 router.post('/LeaveBalance/deleteLeaveBalance', LeaveBalanceController.deleteLeaveBalance)
 router.post('/LeaveBalance/updateLeaveBalance', LeaveBalanceController.updateLeaveBalance)
 router.post('/LeaveBalance/getAllLeaveBalances', LeaveBalanceController.getAllLeaveBalances)
+
+//Attendance Routes
+router.post('/Attendance/dayIn', AttendanceController.checkIn)
+router.post('/Attendance/dayOut', AttendanceController.checkOut)
+router.post('/Attendance/getAttendanceByDate', AttendanceController.getAttendanceByDate)
+router.post('/Attendance/getAttendanceByEmployee', AttendanceController.getAttendanceByEmployee)
+
+//Holiday Routes
+router.post('/Holiday/createHoliday', HolidayController.createHoliday)
+router.post('/Holiday/deleteHoliday', HolidayController.deleteHoliday)
+router.post('/Holiday/updateHoliday', HolidayController.updateHoliday)
+router.post('/Holiday/getAllHolidays', HolidayController.getAllHolidays)
+
 
 module.exports = router;
