@@ -13,7 +13,7 @@ router.post('/Log/createLog', LogControllers.logCreate )
 router.post('/Log/logCountChange', LogControllers.logCountChange )
 
 router.post('/Menu/createMenu', MenuControllers.createMenu)
-router.post('/Menu/insertManyMenus', MenuControllers.InsertMany)
+// router.post('/Menu/insertManyMenus', MenuControllers.InsertMany)
 router.post('/Menu/updateMenu', MenuControllers.updateMenu)
 router.post('/Menu/getAllMenus', MenuControllers.getAllMenus)
 router.post('/Menu/getAllParentsMenu', MenuControllers.getAllParentsMenu)

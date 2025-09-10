@@ -6,14 +6,6 @@ const menuPermissionSchema = new mongoose.Schema({
     ref: 'MenuRegistry',
     required: true
   },
-  formId: {
-    type: String,
-    required: true
-  },
-  parentFormId: {
-    type: String,
-    default: null
-  },
   title: {
     type: String
   },

@@ -4,7 +4,8 @@ const Department = require("../../models/masterModels/Department");
 // CREATE Department
 exports.createDepartment = async (req, res) => {
   try {
-    const department = new Department(req.body);
+    const {departmentName,departmentHead} = req.body
+    const department = new Department({departmentName,departmentHead});
     await department.save();
     res.status(201).json({ message: "Department created successfully", department });
   } catch (error) {

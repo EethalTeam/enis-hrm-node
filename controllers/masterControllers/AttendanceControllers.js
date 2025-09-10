@@ -88,11 +88,6 @@ exports.autoCheckoutOnDisconnect = async (employeeId) => {
       date: { $gte: startOfDay, $lte: endOfDay },
     });
 
-    if (!attendance) {
-      console.log(`⚠️ No attendance record found for employee ${employeeId} today`);
-      return;
-    }
-
     // 3. Get last session (if exists)
     const lastSession = attendance.sessions[attendance.sessions.length - 1];
 
@@ -115,7 +110,6 @@ exports.autoCheckoutOnDisconnect = async (employeeId) => {
       0
     );
       await attendance.save();
-      console.log(`✅ Auto checkout done for employee ${employeeId} at ${workedHours}`);
     }
   } catch (error) {
     console.error("❌ Auto checkout error:", error.message);
