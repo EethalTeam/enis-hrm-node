@@ -146,9 +146,9 @@ exports.getAllMenus = async (req, res) => {
     });
 
     // Enrich with parentTitle
-    const enrichedMenus = menus.map(menu => ({
+    const enrichedMenus = menus.map(menu =>({
       ...menu,
-      parentTitle: menu.parentId ? menuMap[menu.parentId] || null : null
+      parentTitle: menu.parentId ? menuMap[menu.parentId._id] || null : null
     }));
 
     res.status(200).json({
@@ -159,6 +159,53 @@ exports.getAllMenus = async (req, res) => {
   } catch (error) {
     console.error("❌ getAllMenus error:", error);
     res.status(500).json({ success: false, message: "Error fetching menus" });
+  }
+};
+
+exports.getFormattedMenu = async (req, res) => {
+  try {
+    // 1. Fetch all active menus, sorted by order
+    const menus = await Menu.find({ isActive: true }).sort({ order: 1 }).lean();
+
+    // 2. Build lookup map for quick access
+    const menuMap = {};
+    menus.forEach(menu => {
+      menuMap[menu._id.toString()] = {
+        id: menu.id,
+        label: menu.label,
+        path: menu.path,
+        icon: menu.icon || null, // will be resolved in frontend
+        subItems: []
+      };
+    });
+
+    // 3. Create hierarchy
+    const formattedMenus = [];
+    menus.forEach(menu => {
+      if (menu.parentId) {
+        // push into parent
+        if (menuMap[menu.parentId.toString()]) {
+          menuMap[menu.parentId.toString()].subItems.push(menuMap[menu._id.toString()]);
+        }
+      } else {
+        // top-level menu
+        formattedMenus.push(menuMap[menu._id.toString()]);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedMenus,
+      total: formattedMenus.length
+    });
+
+  } catch (error) {
+    console.error("Get formatted menu error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching menus",
+      error: error.message
+    });
   }
 };
 

@@ -17,6 +17,7 @@ router.post('/Menu/createMenu', MenuControllers.createMenu)
 router.post('/Menu/updateMenu', MenuControllers.updateMenu)
 router.post('/Menu/getAllMenus', MenuControllers.getAllMenus)
 router.post('/Menu/getAllParentsMenu', MenuControllers.getAllParentsMenu)
+router.post('/Menu/getFormattedMenu', MenuControllers.getFormattedMenu)
 
 
 router.post('/UserRights/getUserRightsByEmployeeId', UserRightsControllers.getUserRightsByEmployee)

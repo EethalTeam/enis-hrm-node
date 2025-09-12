@@ -101,6 +101,8 @@ router.post('/RoleBased/deleteRole', RBACController.deleteRole)
 router.post('/RoleBased/updateRole', RBACController.updateRole)
 router.post('/RoleBased/getAllRoles', RBACController.getAllRoles)
 router.post('/RoleBased/getAllMenus', RBACController.getAllMenus)
+router.post('/RoleBased/updateMenusAndAccess', RBACController.updateMenusAndAccess)
+router.post('/RoleBased/getPermissions', RBACController.getPermissionsByRoleAndPath)
 
 //Role Routes
 router.post('/Role/createRole', RoleController.createRole)
