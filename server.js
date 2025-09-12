@@ -74,6 +74,7 @@ io.on("connection", (socket) => {
     //   clearTimeout(pendingLogouts.get(employeeId));
     //   pendingLogouts.delete(employeeId);
     // }
+    console.log("logging out")
     await performLogout(employeeId);
   });
 
