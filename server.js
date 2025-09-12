@@ -31,17 +31,17 @@ app.get('/test', (req, res) => {
 
 const server = http.createServer(app);
 
-// const io = new Server(server, {
-//   cors: { origin: "*" },
-// });
-
 const io = new Server(server, {
-  cors: {
-    origin: "https://enishrm.grss.in",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+  cors: { origin: "*" },
 });
+
+// const io = new Server(server, {
+//   cors: {
+//     origin: "https://enishrm.grss.in",
+//     methods: ["GET", "POST"],
+//     credentials: true
+//   }
+// });
 
 app.set("socketio", io);
 
