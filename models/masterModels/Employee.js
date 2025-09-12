@@ -21,6 +21,9 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  birthDate: {
+    type: Date,
+  },
   departmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Department"   // master table
