@@ -71,7 +71,7 @@ io.on("connection", (socket) => {
       console.log(`⚠️ No heartbeat from ${employeeId}, logging out`);
       await performLogout(employeeId);
       heartbeatTimers.delete(employeeId);
-    }, 90000);
+    }, 120000);
 
     heartbeatTimers.set(employeeId, timer);
   });
