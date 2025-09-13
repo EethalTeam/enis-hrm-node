@@ -45,38 +45,47 @@ const io = new Server(server, {
 
 app.set("socketio", io);
 
-const heartbeatTimers = new Map();
+const heartbeatTimers = new Map();       // employeeId -> timeout
+const employeeSockets = new Map();       // employeeId -> Set of socketIds
 
 io.on("connection", (socket) => {
   console.log("⚡ A client connected:", socket.id);
 
+  // ================== Join Room ==================
   socket.on("joinRoom", ({ employeeId }) => {
     socket.employeeId = employeeId;
     socket.join(employeeId);
 
+    if (!employeeSockets.has(employeeId)) {
+      employeeSockets.set(employeeId, new Set());
+    }
+    employeeSockets.get(employeeId).add(socket.id);
+
     console.log(`Socket ${socket.id} joined room: ${employeeId}`);
   });
 
-  // 🫀 Heartbeat listener
+  // ================== Heartbeat ==================
   socket.on("heartbeat", ({ employeeId }) => {
+    if (!employeeId) return;
     console.log(`❤️ Heartbeat from ${employeeId}`);
 
-    // Clear old timer if exists
-    if (heartbeatTimers.has(employeeId)) {
-      clearTimeout(heartbeatTimers.get(employeeId));
-    }
+    // Clear old timer
+    if (heartbeatTimers.has(employeeId)) clearTimeout(heartbeatTimers.get(employeeId));
 
-    // Start new timer → if no heartbeat within 35s, logout
+    // Start new timer (2 min grace period)
     const timer = setTimeout(async () => {
-      console.log(`⚠️ No heartbeat from ${employeeId}, logging out`);
-      await performLogout(employeeId);
-      heartbeatTimers.delete(employeeId);
-    }, 120000);
+      const sockets = employeeSockets.get(employeeId) || new Set();
+      if (sockets.size === 0) { // only logout if no active sockets
+        console.log(`⚠️ No heartbeat from ${employeeId}, logging out`);
+        await performLogout(employeeId);
+        heartbeatTimers.delete(employeeId);
+      }
+    }, 120000); // 2 minutes
 
     heartbeatTimers.set(employeeId, timer);
   });
 
-  // 🚪 Tab closing → immediate logout
+  // ================== Tab Closing ==================
   socket.on("tabClosing", async ({ employeeId }) => {
     console.log("🚪 Tab closed, logging out:", employeeId);
     await performLogout(employeeId);
@@ -85,9 +94,16 @@ io.on("connection", (socket) => {
       clearTimeout(heartbeatTimers.get(employeeId));
       heartbeatTimers.delete(employeeId);
     }
+
+    if (employeeSockets.has(employeeId)) {
+      employeeSockets.get(employeeId).delete(socket.id);
+      if (employeeSockets.get(employeeId).size === 0) {
+        employeeSockets.delete(employeeId);
+      }
+    }
   });
 
-  // 💬 Handle messages
+  // ================== Send Message ==================
   socket.on("sendMessage", async ({ type, message, toEmployeeId = null, groupId = null, meta = {} }) => {
     try {
       const notification = await createNotification({
@@ -105,12 +121,21 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ❌ Handle disconnect
+  // ================== Disconnect ==================
   socket.on("disconnect", () => {
+    const { employeeId } = socket;
+    if (employeeId && employeeSockets.has(employeeId)) {
+      const sockets = employeeSockets.get(employeeId);
+      sockets.delete(socket.id);
+      if (sockets.size === 0) {
+        employeeSockets.delete(employeeId);
+        // Timer will handle logout if heartbeat not received
+      }
+    }
     console.log(`❌ Socket disconnected: ${socket.id}`);
-    // no logout here → handled by heartbeat timeout
   });
 });
+
 
 async function performLogout(employeeId) {
   try {
