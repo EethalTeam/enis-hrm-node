@@ -1,5 +1,5 @@
 // controllers/taskStatusController.js
-const TaskStatus = require("../../models/masterModels/TaskStatus");
+const TaskStatus = require("../../models/masterModels/Taskstatus");
 
 // CREATE TaskStatus
 exports.createTaskStatus = async (req, res) => {
