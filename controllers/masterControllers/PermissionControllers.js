@@ -62,7 +62,12 @@ exports.createPermissionRequest = async (req, res) => {
 // READ - Get all permission requests
 exports.getAllPermissionRequests = async (req, res) => {
   try {
-    const requests = await PermissionRequest.find()
+        const {employeeId} = req.body
+    let filter={}
+    if(employeeId){
+      filter.employeeId = employeeId
+    }
+    const requests = await PermissionRequest.find(filter)
       .populate("employeeId", "name email") // adjust fields as per Employee schema
       .populate("requestedTo", "name email")
       .populate("RequestStatusId", "StatusName");

@@ -6,6 +6,12 @@ const UserRightsControllers = require('../controllers/mainControllers/UserRights
 const ProjectController = require('../controllers/masterControllers/ProjectControllers')
 const TaskController = require('../controllers/masterControllers/TaskControllers')
 const LeaveRequestController = require('../controllers/masterControllers/LeaveRequestControllers')
+const AIControllers = require('../controllers/masterControllers/AiControllers')
+const GeminiControllers = require('../controllers/masterControllers/GeminiAiControllers')
+
+router.post('/chatWithAI', AIControllers.chatWithAI)
+router.post('/chatWithGemini', GeminiControllers.chatWithGemini)
+router.post('/parseAICommand', GeminiControllers.parseAICommand)
 
 router.post('/Log/getAllLogs', LogControllers.getAllLogs )
 router.post('/Log/getFilteredLogs', LogControllers.getFilteredLogs )

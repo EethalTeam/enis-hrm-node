@@ -349,9 +349,9 @@ exports.loginEmployee = async (req, res) => {
     }
 
     // 3. Check if employee is already logged in
-    if (employee.isCurrentlyLoggedIn) {
-      return res.status(403).json({ message: "Employee is already logged in" });
-    }
+    // if (employee.isCurrentlyLoggedIn) {
+    //   return res.status(403).json({ message: "Employee is already logged in" });
+    // }
 
     // 4. Compare plain password (since not hashing yet)
     if (employee.password !== password) {

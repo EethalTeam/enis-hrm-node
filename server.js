@@ -21,6 +21,9 @@ app.use(bodyParser.json());
 app.use(cors());
 require('dotenv').config();
 
+// app.post('/api/chatWithGemini', (req,res)=>{
+//   console.log(req.body,"req.body")
+// })
 app.use('/api', authRoutes);
 app.use('/api', checkLogin, masterRoutes);
 app.use('/api', mainRoutes);
@@ -64,44 +67,44 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} joined room: ${employeeId}`);
   });
 
-  // ================== Heartbeat ==================
-  socket.on("heartbeat", ({ employeeId }) => {
-    if (!employeeId) return;
-    console.log(`❤️ Heartbeat from ${employeeId}`);
+  // // ================== Heartbeat ==================
+  // socket.on("heartbeat", ({ employeeId }) => {
+  //   if (!employeeId) return;
+  //   console.log(`❤️ Heartbeat from ${employeeId}`);
 
-    // Clear old timer
-    if (heartbeatTimers.has(employeeId)) clearTimeout(heartbeatTimers.get(employeeId));
+  //   // Clear old timer
+  //   if (heartbeatTimers.has(employeeId)) clearTimeout(heartbeatTimers.get(employeeId));
 
-    // Start new timer (2 min grace period)
-    const timer = setTimeout(async () => {
-      const sockets = employeeSockets.get(employeeId) || new Set();
-      if (sockets.size === 0) { // only logout if no active sockets
-        console.log(`⚠️ No heartbeat from ${employeeId}, logging out`);
-        await performLogout(employeeId);
-        heartbeatTimers.delete(employeeId);
-      }
-    }, 120000); // 2 minutes
+  //   // Start new timer (2 min grace period)
+  //   const timer = setTimeout(async () => {
+  //     const sockets = employeeSockets.get(employeeId) || new Set();
+  //     if (sockets.size === 0) { // only logout if no active sockets
+  //       console.log(`⚠️ No heartbeat from ${employeeId}, logging out`);
+  //       await performLogout(employeeId);
+  //       heartbeatTimers.delete(employeeId);
+  //     }
+  //   }, 120000); // 2 minutes
 
-    heartbeatTimers.set(employeeId, timer);
-  });
+  //   heartbeatTimers.set(employeeId, timer);
+  // });
 
-  // ================== Tab Closing ==================
-  socket.on("tabClosing", async ({ employeeId }) => {
-    console.log("🚪 Tab closed, logging out:", employeeId);
-    await performLogout(employeeId);
+  // // ================== Tab Closing ==================
+  // socket.on("tabClosing", async ({ employeeId }) => {
+  //   console.log("🚪 Tab closed, logging out:", employeeId);
+  //   await performLogout(employeeId);
 
-    if (heartbeatTimers.has(employeeId)) {
-      clearTimeout(heartbeatTimers.get(employeeId));
-      heartbeatTimers.delete(employeeId);
-    }
+  //   if (heartbeatTimers.has(employeeId)) {
+  //     clearTimeout(heartbeatTimers.get(employeeId));
+  //     heartbeatTimers.delete(employeeId);
+  //   }
 
-    if (employeeSockets.has(employeeId)) {
-      employeeSockets.get(employeeId).delete(socket.id);
-      if (employeeSockets.get(employeeId).size === 0) {
-        employeeSockets.delete(employeeId);
-      }
-    }
-  });
+  //   if (employeeSockets.has(employeeId)) {
+  //     employeeSockets.get(employeeId).delete(socket.id);
+  //     if (employeeSockets.get(employeeId).size === 0) {
+  //       employeeSockets.delete(employeeId);
+  //     }
+  //   }
+  // });
 
   // ================== Send Message ==================
   socket.on("sendMessage", async ({ type, message, toEmployeeId = null, groupId = null, meta = {} }) => {

@@ -64,7 +64,12 @@ exports.createLeaveRequest = async (req, res) => {
 // ✅ Get All Leave Requests
 exports.getAllLeaveRequests = async (req, res) => {
   try {
-    const requests = await LeaveRequest.find()
+    const {employeeId} = req.body
+    let filter={}
+    if(employeeId){
+      filter.employeeId = employeeId
+    }
+    const requests = await LeaveRequest.find(filter)
       .populate("employeeId", "name email")
       .populate("leaveTypeId", "LeaveTypeName")
       .populate("RequestStatusId", "StatusName")
