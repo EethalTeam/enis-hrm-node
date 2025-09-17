@@ -2,9 +2,9 @@
 const OpenAI = require("openai");
 // import Employee from "../models/Employee.js"; // example model
 
-const client = new OpenAI({
-  apiKey: "you-api-key",
-});
+// const client = new OpenAI({
+//   apiKey: "you-api-key",
+// });
 
 // Chat with AI (general chat)
 exports.chatWithAI = async (req, res) => {
