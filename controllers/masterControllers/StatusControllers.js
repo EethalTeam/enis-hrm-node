@@ -44,9 +44,10 @@ exports.getStatusById = async (req, res) => {
 // UPDATE Status
 exports.updateStatus = async (req, res) => {
   try {
+    const {_id,statusName}=req.body
     const status = await Status.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+      _id,
+      {statusName:statusName},
       { new: true, runValidators: true }
     );
 

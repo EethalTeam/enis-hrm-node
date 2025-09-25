@@ -169,8 +169,17 @@ router.post('/LeaveBalance/getAllLeaveBalances', LeaveBalanceController.getAllLe
 //Attendance Routes
 router.post('/Attendance/dayIn', AttendanceController.checkIn)
 router.post('/Attendance/dayOut', AttendanceController.checkOut)
+router.post('/Attendance/breakStart', AttendanceController.startBreak)
+router.post('/Attendance/breakEnd', AttendanceController.endBreak)
 router.post('/Attendance/getAttendanceByDate', AttendanceController.getAttendanceByDate)
 router.post('/Attendance/getAttendanceByEmployee', AttendanceController.getAttendanceByEmployee)
+
+// NEW routes for the dynamic component
+router.post('/Attendance/getAllAttendanceByDate', AttendanceController.getAllAttendanceByDate);
+router.post('/Attendance/getEmployeeAttendanceHistory', AttendanceController.getEmployeeAttendanceHistory);
+router.post('/Attendance/getAttendanceSummary', AttendanceController.getAttendanceSummary);
+router.post('/Attendance/searchEmployeesWithAttendance', AttendanceController.searchEmployeesWithAttendance);
+router.post('/Attendance/getAttendanceReport', AttendanceController.getAttendanceReport);
 
 //Holiday Routes
 router.post('/Holiday/createHoliday', HolidayController.createHoliday)

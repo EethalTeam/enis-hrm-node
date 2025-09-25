@@ -11,19 +11,27 @@ const attendanceSchema = new mongoose.Schema(
     date: {
       type: Date,
       required: true,
-      index: true, // quick lookups per day
+      index: true,
     },
     sessions: [
       {
         checkIn: { type: Date, required: true },
         checkOut: { type: Date },
-        workedHours: { type: Number, default: 0 }, // per session hours
+        workedHours: { type: Number, default: 0 },
+
+        // Multiple breaks inside this session
+        breaks: [
+          {
+            breakStart: { type: Date, required: true },
+            breakEnd: { type: Date },
+            breakDuration: { type: Number, default: 0 }, // minutes/hours
+          },
+        ],
+        totalBreakHours: { type: Number, default: 0 }, // total per session
       },
     ],
-    totalWorkedHours: {
-      type: Number, // total hours for the day
-      default: 0,
-    },
+    totalWorkedHours: { type: Number, default: 0 }, // for the whole day
+    totalBreakHours: { type: Number, default: 0 },  // for the whole day
   },
   { timestamps: true }
 );

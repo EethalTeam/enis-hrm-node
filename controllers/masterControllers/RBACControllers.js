@@ -210,11 +210,15 @@ exports.updateMenusAndAccess = async (req, res) => {
       });
     }
 
-    // Process each menu permission
+    // 🔑 Remove permissions that are not in the new menus list
+    role.permissions = role.permissions.filter(p => 
+      menus.some(m => m.menuId.toString() === p.menuId.toString())
+    );
+
+    // Process each menu permission (update or add)
     for (const menuData of menus) {
       const { menuId, isAdd = false, isEdit = false, isView = false, isDelete = false } = menuData;
       
-      // Find existing permission index
       const existingIndex = role.permissions.findIndex(p => p.menuId.toString() === menuId);
       
       if (existingIndex !== -1) {
@@ -229,13 +233,7 @@ exports.updateMenusAndAccess = async (req, res) => {
         };
       } else {
         // Add new permission
-        role.permissions.push({ 
-          menuId, 
-          isAdd, 
-          isEdit, 
-          isView, 
-          isDelete 
-        });
+        role.permissions.push({ menuId, isAdd, isEdit, isView, isDelete });
       }
     }
 
@@ -254,39 +252,39 @@ exports.updateMenusAndAccess = async (req, res) => {
         }
       },
       {
-  $addFields: {
-    enrichedPermissions: {
-      $map: {
-        input: "$permissions",
-        as: "perm",
-        in: {
-          $mergeObjects: [
-            "$$perm",
-            {
-              MenuName: {
-                $let: {
-                  vars: {
-                    matchedMenu: {
-                      $arrayElemAt: [
-                        {
-                          $filter: {
-                            input: "$menuData",
-                            cond: { $eq: ["$$this._id", "$$perm.menuId"] }
+        $addFields: {
+          enrichedPermissions: {
+            $map: {
+              input: "$permissions",
+              as: "perm",
+              in: {
+                $mergeObjects: [
+                  "$$perm",
+                  {
+                    MenuName: {
+                      $let: {
+                        vars: {
+                          matchedMenu: {
+                            $arrayElemAt: [
+                              {
+                                $filter: {
+                                  input: "$menuData",
+                                  cond: { $eq: ["$$this._id", "$$perm.menuId"] }
+                                }
+                              },
+                              0
+                            ]
                           }
                         },
-                        0
-                      ]
+                        in: "$$matchedMenu.label"  // Changed from "title" to "label"
+                      }
                     }
-                  },
-                  in: "$$matchedMenu.label"  // Changed from "title" to "label"
-                }
+                  }
+                ]
               }
             }
-          ]
-        }
-      }
-    }
-  },
+          }
+        },
       },
       {
         $project: {

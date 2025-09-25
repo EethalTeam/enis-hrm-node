@@ -270,7 +270,7 @@ exports.getAllRoles = async (req, res) => {
 // GET ALL Status
 exports.getAllStatus = async (req, res) => {
   try {
-    const status = await Status.find();
+    const status = await Status.find().limit(2);
     res.status(200).json(status);
   } catch (error) {
     console.error(error);

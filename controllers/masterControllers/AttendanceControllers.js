@@ -1,21 +1,39 @@
 // controllers/attendanceController.js
 const Attendance = require("../../models/masterModels/Attendance");
+const Employee = require("../../models/masterModels/Employee");
 const mongoose = require("mongoose");
+
+// Helper function to get IST date consistently
+const getISTDate = (date = new Date()) => {
+  const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const istTime = new Date(utcTime + istOffset);
+  return istTime;
+};
+
+// Helper function to get start of day in IST as UTC date
+const getStartOfDayIST = (date = new Date()) => {
+  const istDate = getISTDate(date);
+  const startOfDay = new Date(istDate.getFullYear(), istDate.getMonth(), istDate.getDate());
+  return startOfDay;
+};
 
 // 🟢 Employee Check-In
 exports.checkIn = async (req, res) => {
   try {
     const { employeeId } = req.body;
     const now = new Date();
-    const dateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Get start of today in IST timezone
+    const today = getStartOfDayIST(now);
 
-    let attendance = await Attendance.findOne({ employeeId, date: dateOnly });
+    let attendance = await Attendance.findOne({ employeeId, date: today });
 
     if (!attendance) {
-      // first session for the day
+      // First session for the day
       attendance = new Attendance({
         employeeId,
-        date: dateOnly,
+        date: today,
         sessions: [{ checkIn: now }],
       });
     } else {
@@ -23,11 +41,15 @@ exports.checkIn = async (req, res) => {
       if (lastSession && !lastSession.checkOut) {
         return res.status(400).json({ message: "Already checked in. Please check out first." });
       }
-
       attendance.sessions.push({ checkIn: now });
     }
 
     await attendance.save();
+    await Employee.findByIdAndUpdate(
+      employeeId,
+      { statusId: "68d115c6c8cbfdb2d70af549" },
+      { new: true }
+    );
     res.status(200).json({ message: "Checked in successfully", attendance });
   } catch (error) {
     console.error("Check-in error:", error);
@@ -35,14 +57,14 @@ exports.checkIn = async (req, res) => {
   }
 };
 
-// 🔴 Employee Check-Out (worked hours comes from frontend)
+// 🔴 Employee Check-Out
 exports.checkOut = async (req, res) => {
   try {
-    const { employeeId, workedHours } = req.body; // workedHours sent from frontend
+    const { employeeId } = req.body;
     const now = new Date();
-    const dateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const attendance = await Attendance.findOne({ employeeId, date: dateOnly });
+    
+    const today = getStartOfDayIST(now);
+    const attendance = await Attendance.findOne({ employeeId, date: today });
 
     if (!attendance) {
       return res.status(404).json({ message: "No attendance record found for today" });
@@ -53,17 +75,23 @@ exports.checkOut = async (req, res) => {
       return res.status(400).json({ message: "No active check-in found" });
     }
 
-    // update with provided workedHours
+    // Calculate worked hours
     lastSession.checkOut = now;
-    lastSession.workedHours = workedHours; // ✅ frontend controls break deductions
+    const workedMilliseconds = now - lastSession.checkIn;
+    lastSession.workedHours = workedMilliseconds / (1000 * 60 * 60);
 
-    // recalc total
+    // Recalculate totals
     attendance.totalWorkedHours = attendance.sessions.reduce(
       (sum, s) => sum + (s.workedHours || 0),
       0
     );
 
     await attendance.save();
+    await Employee.findByIdAndUpdate(
+      employeeId,
+      { statusId: "68d115cec8cbfdb2d70af54e" },
+      { new: true }
+    );
     res.status(200).json({ message: "Checked out successfully", attendance });
   } catch (error) {
     console.error("Check-out error:", error);
@@ -71,44 +99,133 @@ exports.checkOut = async (req, res) => {
   }
 };
 
+// Start Break
+exports.startBreak = async (req, res) => {
+  try {
+    const { employeeId } = req.body;
+    const now = new Date();
+    
+    const today = getStartOfDayIST(now);
+    let attendance = await Attendance.findOne({ employeeId, date: today });
+    
+    if (!attendance) {
+      return res.status(404).json({ message: "Attendance record not found for today" });
+    }
+
+    if (!attendance.sessions.length) {
+      return res.status(400).json({ message: "No active session available" });
+    }
+
+    const session = attendance.sessions[attendance.sessions.length - 1];
+    const lastBreak = session.breaks[session.breaks.length - 1];
+    
+    if (lastBreak && !lastBreak.breakEnd) {
+      return res.status(400).json({ message: "Already on a break. Please end it first." });
+    }
+
+    session.breaks.push({ breakStart: now });
+
+    await attendance.save();
+    await Employee.findByIdAndUpdate(
+      employeeId,
+      { statusId: "68d115e5c8cbfdb2d70af553" },
+      { new: true }
+    );
+    res.json({
+      success: true,
+      message: "Break started",
+      breakStart: now,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error starting break", error: error.message });
+  }
+};
+
+// End Break
+exports.endBreak = async (req, res) => {
+  try {
+    const { employeeId } = req.body;
+    const now = new Date();
+    
+    const today = getStartOfDayIST(now);
+    let attendance = await Attendance.findOne({ employeeId, date: today });
+    
+    if (!attendance) {
+      return res.status(404).json({ message: "Attendance record not found for today" });
+    }
+
+    if (!attendance.sessions.length) {
+      return res.status(400).json({ message: "No active session available" });
+    }
+
+    const session = attendance.sessions[attendance.sessions.length - 1];
+
+    if (!session.breaks.length) {
+      return res.status(400).json({ message: "No active break to end" });
+    }
+
+    const lastBreak = session.breaks[session.breaks.length - 1];
+    if (lastBreak.breakEnd) {
+      return res.status(400).json({ message: "This break already ended" });
+    }
+
+    lastBreak.breakEnd = now;
+    const durationMs = now - lastBreak.breakStart;
+    lastBreak.breakDuration = durationMs / (1000 * 60 * 60);
+
+    session.totalBreakHours = session.breaks.reduce(
+      (sum, b) => sum + (b.breakDuration || 0),
+      0
+    );
+
+    attendance.totalBreakHours = attendance.sessions.reduce(
+      (sum, s) => sum + (s.totalBreakHours || 0),
+      0
+    );
+
+    await attendance.save();
+    await Employee.findByIdAndUpdate(
+      employeeId,
+      { statusId: "68d115c6c8cbfdb2d70af549" },
+      { new: true }
+    );
+    res.json({
+      success: true,
+      message: "Break ended",
+      breakEnd: now,
+      breakDuration: lastBreak.breakDuration,
+      totalSessionBreakHours: session.totalBreakHours,
+      totalDayBreakHours: attendance.totalBreakHours,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error ending break", error: error.message });
+  }
+};
+
 exports.autoCheckoutOnDisconnect = async (employeeId) => {
   try {
     if (!employeeId) return;
 
-    // 1. Define start and end of today's date
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const today = getStartOfDayIST();
+    const attendance = await Attendance.findOne({ employeeId, date: today });
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    if (!attendance || !attendance.sessions.length) return;
 
-    // 2. Find today's attendance record
-    const attendance = await Attendance.findOne({
-      employeeId,
-      date: { $gte: startOfDay, $lte: endOfDay },
-    });
-
-    // 3. Get last session (if exists)
     const lastSession = attendance.sessions[attendance.sessions.length - 1];
 
-    // 4. If last session exists and has no checkout, close it
     if (lastSession && !lastSession.checkOut) {
       const checkOutTime = new Date();
-
-      // totalHours will be handled in frontend usually,
-      // but for auto checkout, we can at least log 0 or elapsed
       const elapsedMs = checkOutTime - new Date(lastSession.checkIn);
-      const totalSeconds = Math.floor(elapsedMs / 1000);
-
-      // Convert ms → hours (decimal)
-      const workedHours = (elapsedMs / (1000 * 60 * 60)).toFixed(2); // e.g. 0.01, 1.25, etc.
+      const workedHours = elapsedMs / (1000 * 60 * 60);
+      
       lastSession.checkOut = checkOutTime;
-      lastSession.workedHours = workedHours; // decimal hours
-  // recalc total
-    attendance.totalWorkedHours = attendance.sessions.reduce(
-      (sum, s) => sum + (s.workedHours || 0),
-      0
-    );
+      lastSession.workedHours = workedHours;
+
+      attendance.totalWorkedHours = attendance.sessions.reduce(
+        (sum, s) => sum + (s.workedHours || 0),
+        0
+      );
+      
       await attendance.save();
     }
   } catch (error) {
@@ -121,7 +238,7 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const { employeeId, date } = req.body;
     const queryDate = new Date(date);
-    const dateOnly = new Date(queryDate.getFullYear(), queryDate.getMonth(), queryDate.getDate());
+    const dateOnly = getStartOfDayIST(queryDate);
 
     const attendance = await Attendance.findOne({ employeeId, date: dateOnly });
     if (!attendance) {
@@ -145,5 +262,317 @@ exports.getAttendanceByEmployee = async (req, res) => {
   } catch (error) {
     console.error("Get employee attendance error:", error);
     res.status(500).json({ message: "Failed to get employee attendance", error: error.message });
+  }
+};
+
+// 📅 Get ALL attendance records for a specific date (MAIN FIX HERE)
+exports.getAllAttendanceByDate = async (req, res) => {
+  try {
+    const { date, _id, role } = req.body;
+    
+    // Convert the input date to start of day in IST
+    const inputDate = new Date(date);
+    const queryDate = getStartOfDayIST(inputDate);
+    
+    // Build query based on user role
+    let query = { date: queryDate };
+    
+    if (role !== 'Super Admin' && role !== 'Admin') {
+      // Add role-based filtering here if needed
+    }
+
+    const attendance = await Attendance.find(query)
+      .populate('employeeId', 'name department employeeId status')
+      .sort({ 'employeeId.name': 1 });
+
+    // Ensure all records have calculated totals
+    const processedAttendance = attendance.map(record => {
+      const totalWorkedHours = record.totalWorkedHours ?? record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
+      const totalBreakHours = record.totalBreakHours ?? record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
+      
+      return {
+        ...record.toObject(),
+        totalWorkedHours,
+        totalBreakHours,
+      };
+    });
+
+    res.status(200).json({ 
+      success: true,
+      attendance: processedAttendance,
+      message: processedAttendance.length > 0 ? "Attendance records found" : "No attendance records found for this date"
+    });
+  } catch (error) {
+    console.error("Get all attendance by date error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to get attendance records", 
+      error: error.message 
+    });
+  }
+};
+
+// 📊 Get Employee's complete attendance history (FIXED)
+exports.getEmployeeAttendanceHistory = async (req, res) => {
+  try {
+    const { employeeId, _id, role, startDate, endDate } = req.body;
+
+    // Build date range query
+    let dateQuery = {};
+    if (startDate && endDate) {
+      const start = getStartOfDayIST(new Date(startDate));
+      const end = getStartOfDayIST(new Date(endDate));
+      dateQuery = {
+        date: { $gte: start, $lte: end }
+      };
+    } else {
+      // Default to last 90 days
+      const today = getStartOfDayIST();
+      const threeMonthsAgo = new Date(today);
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      dateQuery = {
+        date: { $gte: threeMonthsAgo, $lte: today }
+      };
+    }
+
+    if (role !== 'Super Admin' && role !== 'Admin') {
+      // Add role-based filtering if needed
+    }
+
+    const attendance = await Attendance.find({
+      employeeId: employeeId,
+      ...dateQuery
+    })
+    .populate('employeeId', 'name department employeeId')
+    .sort({ date: -1 });
+
+    // Ensure all records have calculated totals
+    const processedAttendance = attendance.map(record => {
+      const totalWorkedHours = record.totalWorkedHours ?? record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
+      const totalBreakHours = record.totalBreakHours ?? record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
+      
+      return {
+        ...record.toObject(),
+        totalWorkedHours,
+        totalBreakHours,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      attendance: processedAttendance,
+      message: processedAttendance.length > 0 ? "Attendance history found" : "No attendance history found"
+    });
+  } catch (error) {
+    console.error("Get employee attendance history error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get attendance history",
+      error: error.message
+    });
+  }
+};
+
+// 📈 Get attendance summary/statistics for dashboard
+exports.getAttendanceSummary = async (req, res) => {
+  try {
+    const { date, _id, role } = req.body;
+    const queryDate = getStartOfDayIST(new Date(date));
+
+    const attendance = await Attendance.find({ date: queryDate })
+      .populate('employeeId', 'name department employeeId status');
+
+    const totalEmployees = await Employee.countDocuments({ status: 'Active' });
+    const presentEmployees = attendance.length;
+    const absentEmployees = totalEmployees - presentEmployees;
+    
+    let activeEmployees = 0;
+    let onBreakEmployees = 0;
+    let totalWorkedHours = 0;
+    let totalBreakHours = 0;
+
+    attendance.forEach(record => {
+      totalWorkedHours += record.totalWorkedHours || 0;
+      totalBreakHours += record.totalBreakHours || 0;
+
+      const hasActiveSession = record.sessions.some(session => !session.checkOut);
+      if (hasActiveSession) activeEmployees++;
+
+      const hasActiveBreak = record.sessions.some(session =>
+        session.breaks && session.breaks.some(breakItem => !breakItem.breakEnd)
+      );
+      if (hasActiveBreak) onBreakEmployees++;
+    });
+
+    const summary = {
+      totalEmployees,
+      presentEmployees,
+      absentEmployees,
+      activeEmployees,
+      onBreakEmployees,
+      totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
+      totalBreakHours: Math.round(totalBreakHours * 100) / 100,
+      averageWorkedHours: presentEmployees > 0 ? Math.round((totalWorkedHours / presentEmployees) * 100) / 100 : 0
+    };
+
+    res.status(200).json({
+      success: true,
+      summary,
+      message: "Attendance summary calculated successfully"
+    });
+  } catch (error) {
+    console.error("Get attendance summary error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get attendance summary",
+      error: error.message
+    });
+  }
+};
+
+// 🔍 Search employees with attendance status for a date
+exports.searchEmployeesWithAttendance = async (req, res) => {
+  try {
+    const { date, searchTerm, _id, role } = req.body;
+    const queryDate = getStartOfDayIST(new Date(date));
+
+    let employeeQuery = {};
+    if (searchTerm) {
+      employeeQuery = {
+        $or: [
+          { name: { $regex: searchTerm, $options: 'i' } },
+          { department: { $regex: searchTerm, $options: 'i' } },
+          { employeeId: { $regex: searchTerm, $options: 'i' } },
+          { email: { $regex: searchTerm, $options: 'i' } }
+        ]
+      };
+    }
+
+    if (role !== 'Super Admin' && role !== 'Admin') {
+      // Add role-based filtering here if needed
+    }
+
+    const employees = await Employee.find(employeeQuery).select('name department employeeId email status');
+    const employeeIds = employees.map(emp => emp._id);
+    const attendance = await Attendance.find({
+      employeeId: { $in: employeeIds },
+      date: queryDate
+    }).populate('employeeId', 'name department employeeId');
+
+    const employeesWithAttendance = employees.map(employee => {
+      const attendanceRecord = attendance.find(att => 
+        att.employeeId._id.toString() === employee._id.toString()
+      );
+      
+      return {
+        ...employee.toObject(),
+        attendance: attendanceRecord || null,
+        status: attendanceRecord ? 'Present' : 'Absent'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      employees: employeesWithAttendance,
+      message: `Found ${employeesWithAttendance.length} employees`
+    });
+  } catch (error) {
+    console.error("Search employees with attendance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to search employees",
+      error: error.message
+    });
+  }
+};
+
+// 📋 Get attendance report for date range
+exports.getAttendanceReport = async (req, res) => {
+  try {
+    const { startDate, endDate, employeeId, department, _id, role } = req.body;
+
+    let dateQuery = {};
+    if (startDate && endDate) {
+      const start = getStartOfDayIST(new Date(startDate));
+      const end = getStartOfDayIST(new Date(endDate));
+      dateQuery = {
+        date: { $gte: start, $lte: end }
+      };
+    } else {
+      // Default to current month
+      const now = getStartOfDayIST();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      dateQuery = {
+        date: { $gte: startOfMonth, $lte: endOfMonth }
+      };
+    }
+
+    let attendanceQuery = { ...dateQuery };
+    if (employeeId) {
+      attendanceQuery.employeeId = employeeId;
+    }
+
+    let attendance = await Attendance.find(attendanceQuery)
+      .populate('employeeId', 'name department employeeId email')
+      .sort({ date: -1, 'employeeId.name': 1 });
+
+    if (department) {
+      attendance = attendance.filter(record => 
+        record.employeeId.department === department
+      );
+    }
+
+    if (role !== 'Super Admin' && role !== 'Admin') {
+      // Add role-based filtering logic here
+    }
+
+    const totalRecords = attendance.length;
+    const totalWorkedHours = attendance.reduce((sum, record) => sum + (record.totalWorkedHours || 0), 0);
+    const totalBreakHours = attendance.reduce((sum, record) => sum + (record.totalBreakHours || 0), 0);
+    const averageWorkedHours = totalRecords > 0 ? totalWorkedHours / totalRecords : 0;
+
+    // Group by employee for summary
+    const employeeSummary = {};
+    attendance.forEach(record => {
+      const empId = record.employeeId._id.toString();
+      if (!employeeSummary[empId]) {
+        employeeSummary[empId] = {
+          employee: record.employeeId,
+          totalDays: 0,
+          totalWorkedHours: 0,
+          totalBreakHours: 0,
+          averageWorkedHours: 0
+        };
+      }
+      employeeSummary[empId].totalDays++;
+      employeeSummary[empId].totalWorkedHours += record.totalWorkedHours || 0;
+      employeeSummary[empId].totalBreakHours += record.totalBreakHours || 0;
+    });
+
+    Object.keys(employeeSummary).forEach(empId => {
+      const summary = employeeSummary[empId];
+      summary.averageWorkedHours = summary.totalDays > 0 ? summary.totalWorkedHours / summary.totalDays : 0;
+    });
+
+    res.status(200).json({
+      success: true,
+      attendance,
+      summary: {
+        totalRecords,
+        totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
+        totalBreakHours: Math.round(totalBreakHours * 100) / 100,
+        averageWorkedHours: Math.round(averageWorkedHours * 100) / 100
+      },
+      employeeSummary: Object.values(employeeSummary),
+      message: `Found ${totalRecords} attendance records`
+    });
+  } catch (error) {
+    console.error("Get attendance report error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get attendance report",
+      error: error.message
+    });
   }
 };
