@@ -50,10 +50,10 @@ const LeadSchema = new mongoose.Schema(
     nextFollowUp: {
       type: Date
     },
-    notes: {
+    notes: [{
       type: String,
       trim: true
-    },
+    }],
     isActive: {
       type: Boolean,
       default: true
