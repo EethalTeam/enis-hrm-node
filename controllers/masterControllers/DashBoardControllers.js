@@ -59,9 +59,6 @@ exports.getLateLoginsForToday = async (req, res) => {
         const checkInTime = new Date(att.sessions[0].checkIn);
         const [shiftHour, shiftMinute] = att.shift.startTime.split(':').map(Number);
         
-        // ======================= THIS IS THE FIX =======================
-        // Use Intl.DateTimeFormat to get the hour and minute in the correct IST timezone,
-        // regardless of the server's location.
         const timeOptions = { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false };
         const formatter = new Intl.DateTimeFormat('en-US', timeOptions);
         const parts = formatter.formatToParts(checkInTime);
@@ -69,9 +66,7 @@ exports.getLateLoginsForToday = async (req, res) => {
         const checkInHourIST = parseInt(parts.find(p => p.type === 'hour').value);
         const checkInMinuteIST = parseInt(parts.find(p => p.type === 'minute').value);
 
-        // Compare using the correct IST values
         const isLate = checkInHourIST > shiftHour || (checkInHourIST === shiftHour && checkInMinuteIST > shiftMinute);
-        // ===============================================================
 
         if (!isLate) {
             return false;
@@ -94,7 +89,14 @@ exports.getLateLoginsForToday = async (req, res) => {
         return {
             _id: att.employee._id,
             name: att.employee.name,
-            loginTime: loginTimeDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            // ================= THIS IS THE FIX =================
+            loginTime: loginTimeDate.toLocaleTimeString('en-IN', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                hour12: true, 
+                timeZone: 'Asia/Kolkata' 
+            }),
+            // ===================================================
             rawLoginTime: loginTimeDate,
             shiftStartTime: att.shift.startTime
         };
