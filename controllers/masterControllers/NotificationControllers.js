@@ -2,6 +2,7 @@ const Notification = require("../../models/masterModels/Notifications");
 const Group = require("../../models/masterModels/Group"); // Your group schema
 const LeaveRequest = require("../../models/masterModels/LeaveRequest");
 const PermissionRequest = require("../../models/masterModels/Permissions");
+const Task = require('../../models/masterModels/Task')
 const mongoose = require('mongoose');
 
 // Create a notification
@@ -133,7 +134,8 @@ exports.updateNotificationStatus = async (req, res) => {
 
     const STATUS = {
       approved: "68b6a2610c502941d03c6372",
-      rejected: "68b6a2680c502941d03c6376"
+      rejected: "68b6a2680c502941d03c6376",
+      complete: "68b5a26d88e62ec178bb292b"
     };
 
     const newStatus = action === "approve" ? "approved" : "rejected";
@@ -163,6 +165,15 @@ exports.updateNotificationStatus = async (req, res) => {
       await PermissionRequest.findByIdAndUpdate(
         notification.meta.permissionRequestId,
         { RequestStatusId: STATUS[newStatus] },
+        { new: true }
+      );
+    }
+
+        // ✅ If notification is for Permission Request
+    if (notification.type === "task-complete" && notification.meta?.taskId) {
+      await Task.findByIdAndUpdate(
+        notification.meta.taskId,
+        { taskStatusId: STATUS['complete'] },
         { new: true }
       );
     }

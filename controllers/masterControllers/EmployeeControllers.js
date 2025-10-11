@@ -200,7 +200,9 @@ exports.getAllEmployees = async (req, res) => {
           workLocationName: "$workLocation.locationName",
 
           shiftId: 1,
-          shiftName: "$shift.shiftName"
+          shiftName: "$shift.shiftName",
+          shiftStartTime:"$shift.startTime",
+          shiftEndTime:"$shift.endTime"
         }
       }
     ]);

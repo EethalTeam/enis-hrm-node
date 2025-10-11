@@ -3,20 +3,28 @@ const Attendance = require("../../models/masterModels/Attendance");
 const Employee = require("../../models/masterModels/Employee");
 const mongoose = require("mongoose");
 
-// Helper function to get IST date consistently
-const getISTDate = (date = new Date()) => {
-  const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const istTime = new Date(utcTime + istOffset);
-  return istTime;
-};
+// =================== THIS FUNCTION IS THE FIX ===================
+/**
+ * Creates a Date object representing the start of the day (00:00:00 UTC)
+ * for the given date in the 'Asia/Kolkata' timezone.
+ * @param {Date} date The date to convert. Defaults to now.
+ * @returns {Date} A Date object set to midnight UTC for the corresponding IST day.
+ */
+const getStartOfDayISTAsUTC = (date = new Date()) => {
+  // Use the standard Intl.DateTimeFormat API for robust timezone handling
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric' };
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(date);
 
-// Helper function to get start of day in IST as UTC date
-const getStartOfDayIST = (date = new Date()) => {
-  const istDate = getISTDate(date);
-  const startOfDay = new Date(istDate.getFullYear(), istDate.getMonth(), istDate.getDate());
-  return startOfDay;
+  const year = parseInt(parts.find(p => p.type === 'year').value);
+  const month = parseInt(parts.find(p => p.type === 'month').value);
+  const day = parseInt(parts.find(p => p.type === 'day').value);
+
+  // Create a new Date object using UTC values.
+  // The month for Date.UTC is 0-indexed, so we subtract 1.
+  return new Date(Date.UTC(year, month - 1, day));
 };
+// ================================================================
 
 // 🟢 Employee Check-In
 exports.checkIn = async (req, res) => {
@@ -24,8 +32,8 @@ exports.checkIn = async (req, res) => {
     const { employeeId } = req.body;
     const now = new Date();
     
-    // Get start of today in IST timezone
-    const today = getStartOfDayIST(now);
+    // FIX: Use the new, correct helper function
+    const today = getStartOfDayISTAsUTC(now);
 
     let attendance = await Attendance.findOne({ employeeId, date: today });
 
@@ -47,7 +55,7 @@ exports.checkIn = async (req, res) => {
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
-      { statusId: "68d115c6c8cbfdb2d70af549" },
+      { statusId: "68d115c6c8cbfdb2d70af549" }, // Assuming this is 'Online' status
       { new: true }
     );
     res.status(200).json({ message: "Checked in successfully", attendance });
@@ -63,7 +71,8 @@ exports.checkOut = async (req, res) => {
     const { employeeId } = req.body;
     const now = new Date();
     
-    const today = getStartOfDayIST(now);
+    // FIX: Use the new, correct helper function
+    const today = getStartOfDayISTAsUTC(now);
     const attendance = await Attendance.findOne({ employeeId, date: today });
 
     if (!attendance) {
@@ -89,7 +98,7 @@ exports.checkOut = async (req, res) => {
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
-      { statusId: "68d115cec8cbfdb2d70af54e" },
+      { statusId: "68d115cec8cbfdb2d70af54e" }, // Assuming this is 'Offline' status
       { new: true }
     );
     res.status(200).json({ message: "Checked out successfully", attendance });
@@ -105,20 +114,21 @@ exports.startBreak = async (req, res) => {
     const { employeeId } = req.body;
     const now = new Date();
     
-    const today = getStartOfDayIST(now);
+    // FIX: Use the new, correct helper function
+    const today = getStartOfDayISTAsUTC(now);
     let attendance = await Attendance.findOne({ employeeId, date: today });
     
     if (!attendance) {
       return res.status(404).json({ message: "Attendance record not found for today" });
     }
 
-    if (!attendance.sessions.length) {
-      return res.status(400).json({ message: "No active session available" });
+    // ... (rest of the code is fine)
+    const session = attendance.sessions[attendance.sessions.length - 1];
+    if (!session || session.checkOut) {
+        return res.status(400).json({ message: "No active session to start a break" });
     }
 
-    const session = attendance.sessions[attendance.sessions.length - 1];
     const lastBreak = session.breaks[session.breaks.length - 1];
-    
     if (lastBreak && !lastBreak.breakEnd) {
       return res.status(400).json({ message: "Already on a break. Please end it first." });
     }
@@ -128,7 +138,7 @@ exports.startBreak = async (req, res) => {
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
-      { statusId: "68d115e5c8cbfdb2d70af553" },
+      { statusId: "68d115e5c8cbfdb2d70af553" }, // Assuming 'On Break'
       { new: true }
     );
     res.json({
@@ -147,20 +157,17 @@ exports.endBreak = async (req, res) => {
     const { employeeId } = req.body;
     const now = new Date();
     
-    const today = getStartOfDayIST(now);
+    // FIX: Use the new, correct helper function
+    const today = getStartOfDayISTAsUTC(now);
     let attendance = await Attendance.findOne({ employeeId, date: today });
     
     if (!attendance) {
       return res.status(404).json({ message: "Attendance record not found for today" });
     }
 
-    if (!attendance.sessions.length) {
-      return res.status(400).json({ message: "No active session available" });
-    }
-
+    // ... (rest of the code is fine)
     const session = attendance.sessions[attendance.sessions.length - 1];
-
-    if (!session.breaks.length) {
+     if (!session || !session.breaks.length) {
       return res.status(400).json({ message: "No active break to end" });
     }
 
@@ -186,16 +193,13 @@ exports.endBreak = async (req, res) => {
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
-      { statusId: "68d115c6c8cbfdb2d70af549" },
+      { statusId: "68d115c6c8cbfdb2d70af549" }, // Back to 'Online'
       { new: true }
     );
     res.json({
       success: true,
       message: "Break ended",
       breakEnd: now,
-      breakDuration: lastBreak.breakDuration,
-      totalSessionBreakHours: session.totalBreakHours,
-      totalDayBreakHours: attendance.totalBreakHours,
     });
   } catch (error) {
     res.status(500).json({ message: "Error ending break", error: error.message });
@@ -206,7 +210,7 @@ exports.autoCheckoutOnDisconnect = async (employeeId) => {
   try {
     if (!employeeId) return;
 
-    const today = getStartOfDayIST();
+    const today = getStartOfDayISTAsUTC();
     const attendance = await Attendance.findOne({ employeeId, date: today });
 
     if (!attendance || !attendance.sessions.length) return;
@@ -238,7 +242,7 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const { employeeId, date } = req.body;
     const queryDate = new Date(date);
-    const dateOnly = getStartOfDayIST(queryDate);
+    const dateOnly = getStartOfDayISTAsUTC(queryDate);
 
     const attendance = await Attendance.findOne({ employeeId, date: dateOnly });
     if (!attendance) {
@@ -272,7 +276,7 @@ exports.getAllAttendanceByDate = async (req, res) => {
     
     // Convert the input date to start of day in IST
     const inputDate = new Date(date);
-    const queryDate = getStartOfDayIST(inputDate);
+    const queryDate = getStartOfDayISTAsUTC(inputDate);
     
     // Build query based on user role
     let query = { date: queryDate };
@@ -320,14 +324,14 @@ exports.getEmployeeAttendanceHistory = async (req, res) => {
     // Build date range query
     let dateQuery = {};
     if (startDate && endDate) {
-      const start = getStartOfDayIST(new Date(startDate));
-      const end = getStartOfDayIST(new Date(endDate));
+      const start = getStartOfDayISTAsUTC(new Date(startDate));
+      const end = getStartOfDayISTAsUTC(new Date(endDate));
       dateQuery = {
         date: { $gte: start, $lte: end }
       };
     } else {
       // Default to last 90 days
-      const today = getStartOfDayIST();
+      const today = getStartOfDayISTAsUTC();
       const threeMonthsAgo = new Date(today);
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       dateQuery = {
@@ -377,7 +381,7 @@ exports.getEmployeeAttendanceHistory = async (req, res) => {
 exports.getAttendanceSummary = async (req, res) => {
   try {
     const { date, _id, role } = req.body;
-    const queryDate = getStartOfDayIST(new Date(date));
+    const queryDate = getStartOfDayISTAsUTC(new Date(date));
 
     const attendance = await Attendance.find({ date: queryDate })
       .populate('employeeId', 'name department employeeId status');
@@ -434,7 +438,7 @@ exports.getAttendanceSummary = async (req, res) => {
 exports.searchEmployeesWithAttendance = async (req, res) => {
   try {
     const { date, searchTerm, _id, role } = req.body;
-    const queryDate = getStartOfDayIST(new Date(date));
+    const queryDate = getStartOfDayISTAsUTC(new Date(date));
 
     let employeeQuery = {};
     if (searchTerm) {
@@ -493,14 +497,14 @@ exports.getAttendanceReport = async (req, res) => {
 
     let dateQuery = {};
     if (startDate && endDate) {
-      const start = getStartOfDayIST(new Date(startDate));
-      const end = getStartOfDayIST(new Date(endDate));
+      const start = getStartOfDayISTAsUTC(new Date(startDate));
+      const end = getStartOfDayISTAsUTC(new Date(endDate));
       dateQuery = {
         date: { $gte: start, $lte: end }
       };
     } else {
       // Default to current month
-      const now = getStartOfDayIST();
+      const now = getStartOfDayISTAsUTC();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       dateQuery = {

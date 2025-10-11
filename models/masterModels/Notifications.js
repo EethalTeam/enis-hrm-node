@@ -33,6 +33,7 @@ const notificationSchema = new mongoose.Schema(
         "group-chat-message",
         "announcement",
         "task-assignment",
+        "task-complete",
         "holiday-notice",
         "system-alert",
         "other"

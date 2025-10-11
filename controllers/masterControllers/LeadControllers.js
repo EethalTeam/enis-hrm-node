@@ -2,6 +2,8 @@
 const Lead = require('../../models/masterModels/Leads');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
+const { fetch } = require("undici");
+const xml2js = require("xml2js");
 
 // Create a new Lead
 exports.createLead = async (req, res) => {
@@ -187,3 +189,23 @@ if (invalidRows.length) {
     res.status(500).json({ message: "Failed to import leads", error: error.message });
   }
 };
+
+exports.getLeadsFromIndiaMart = async (req, res) =>{
+const MOBILE = 8754573741;   // the mobile/email used in IndiaMART
+const API_KEY = 'mRy2G7Bl7HbCSvep5nGN7liMoVTElTI=' 
+ try {
+    const url = `https://mapi.indiamart.com/wservce/enquiry/listing/${MOBILE}/${API_KEY}/`;
+
+   const response = await fetch(url);
+    const xmlText = await response.text();   // get raw XML
+    
+    // parse XML → JSON
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(xmlText);
+
+    res.json(result);  // now you’ll see proper JSON
+  } catch (error) {
+    console.error("❌ Error fetching IndiaMART leads:", error);
+    res.status(500).json({ error: "Failed to fetch IndiaMART leads" });
+  }
+}

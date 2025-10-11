@@ -8,10 +8,16 @@ const TaskController = require('../controllers/masterControllers/TaskControllers
 const LeaveRequestController = require('../controllers/masterControllers/LeaveRequestControllers')
 const AIControllers = require('../controllers/masterControllers/AiControllers')
 const GeminiControllers = require('../controllers/masterControllers/GeminiAiControllers')
+const DashBoardControllers = require('../controllers/masterControllers/DashBoardControllers')
+const AttendanceReportControllers = require('../controllers/masterControllers/AttendanceReportControllers')
 
 router.post('/chatWithAI', AIControllers.chatWithAI)
 router.post('/chatWithGemini', GeminiControllers.chatWithGemini)
 router.post('/parseAICommand', GeminiControllers.parseAICommand)
+
+router.post('/DashBoard/getLateLogins', DashBoardControllers.getLateLoginsForToday)
+
+router.post('/Attendance/report', AttendanceReportControllers.getMonthlyReport)
 
 router.post('/Log/getAllLogs', LogControllers.getAllLogs )
 router.post('/Log/getFilteredLogs', LogControllers.getFilteredLogs )

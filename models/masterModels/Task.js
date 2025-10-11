@@ -44,9 +44,15 @@ const TaskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
     },
-
-    // New fields
     feedback: {
+      type: String,
+      trim: true,
+    },
+    reqLeadCount: {
+      type: String,
+      trim: true,
+    },
+    compLeadCount: {
       type: String,
       trim: true,
     },

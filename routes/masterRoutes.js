@@ -115,6 +115,7 @@ router.post('/Lead/createLead', LeadController.createLead)
 router.post('/Lead/deleteLead', LeadController.deleteLead)
 router.post('/Lead/updateLead', LeadController.updateLead)
 router.post('/Lead/getAllLeads', LeadController.getAllLeads)
+router.post('/Lead/getLeadsFromIndiaMart', LeadController.getLeadsFromIndiaMart)
 router.post('/importLeadsExcel', upload.single('file'), LeadController.importLeads);
 
 //LeadStatus Routes

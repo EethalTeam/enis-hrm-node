@@ -1,6 +1,16 @@
 // controllers/taskController.js
 const Task = require("../../models/masterModels/Task");
 const Notification = require('../../models/masterModels/Notifications')
+const Employee = require('../../models/masterModels/Employee')
+
+function getIndiaDateTime() {
+  const now = new Date();
+  const indiaTime = now.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+  });
+
+  return indiaTime; 
+}
 
 // ✅ Create Task
 exports.createTask = async (req, res) => {
@@ -16,6 +26,8 @@ exports.createTask = async (req, res) => {
       taskPriorityId,
       assignedTo,
       createdBy,
+      reqLeadCount,
+      compLeadCount
     } = req.body;
 
     // Validation: require taskCode, taskName, projectId
@@ -34,6 +46,8 @@ exports.createTask = async (req, res) => {
       taskPriorityId,
       assignedTo,
       createdBy,
+      reqLeadCount,
+      compLeadCount
     });
 
     await task.save();
@@ -113,6 +127,8 @@ exports.updateTask = async (req, res) => {
       taskStatusId,
       taskPriorityId,
       assignedTo,
+      reqLeadCount,
+      compLeadCount
     } = req.body;
 
     const task = await Task.findById(_id);
@@ -128,6 +144,8 @@ exports.updateTask = async (req, res) => {
     if (taskStatusId !== undefined) task.taskStatusId = taskStatusId;
     if (taskPriorityId !== undefined) task.taskPriorityId = taskPriorityId;
     if (assignedTo !== undefined) task.assignedTo = assignedTo;
+    if(reqLeadCount !== undefined) task.reqLeadCount = reqLeadCount;
+    if(compLeadCount !== undefined) task.compLeadCount = compLeadCount; 
 
     await task.save();
     res.status(200).json({ message: "Task updated successfully", task });
@@ -139,7 +157,7 @@ exports.updateTask = async (req, res) => {
 
 exports.updateTaskStatus = async (req, res) => {
   try {
-    const { taskId, status, feedback, progressDetails, reasonForPending } = req.body;
+    const { taskId, status, feedback, progressDetails, reasonForPending ,reqLeadCount,compLeadCount} = req.body;
 
     if (!taskId || !status) {
       return res.status(400).json({ message: "Task ID and status are required" });
@@ -149,22 +167,42 @@ exports.updateTaskStatus = async (req, res) => {
     const statusMap = {
       Start: { id: "68b5a26288e62ec178bb2927", message: "Task Started" },     // In Progress
       Pause: { id: "68b5a25b88e62ec178bb2923", message: "Task Paused" },      // To Do
-      Complete: { id: "68b5a26d88e62ec178bb292b", message: "Task Completed" } // Completed
+      // Complete: { id: "68b5a26d88e62ec178bb292b", message: "Task Completed" } // Completed
     };
-
-    const selectedStatus = statusMap[status];
-
-    if (!selectedStatus) {
+        const updateObj = {};
+        const selectedStatus = statusMap[status];
+    if(status === 'Complete'){
+ const taskname=await Task.findOne({_id:taskId})
+    const assignedEmployee=await Employee.findOne({_id:taskname.assignedTo})
+        // 2️⃣ Create a notification for the approver
+        const notification = await Notification.create({
+          type: "task-complete",
+          message: `Task Completed by ${assignedEmployee.name} - ${taskname.taskName} (${taskname.description}), FeedBack:${feedback}`,
+          fromEmployeeId: taskname.assignedTo,
+          toEmployeeId: taskname.createdBy,
+          status: "unseen",
+          meta: {
+            taskId: taskId
+          }
+        });
+        // 3️⃣ Emit notification via Socket.IO
+        const io = req.app.get("socketio");
+        if (io && taskname.createdBy) {
+          io.to(taskname.createdBy.toString()).emit("receiveNotification", notification);
+        }
+    }else{
+    if (!selectedStatus && status !== 'Complete') {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
     // Build update object
-    const updateObj = { taskStatusId: selectedStatus.id };
-    
+    updateObj.taskStatusId = selectedStatus.id ;
+    }    
     if (feedback) updateObj.feedback = feedback;
+    if (compLeadCount) updateObj.compLeadCount = compLeadCount
 
     const pushObj = {};
-    if (progressDetails) pushObj.progressDetails = progressDetails;
+    if (progressDetails) pushObj.progressDetails = `${progressDetails} - ${getIndiaDateTime()}`;
     if (reasonForPending) pushObj.reasonForPending = reasonForPending;
     
     if (Object.keys(pushObj).length > 0) {
@@ -181,7 +219,7 @@ exports.updateTaskStatus = async (req, res) => {
     }
 
     res.status(200).json({
-      message: selectedStatus.message,
+      message: status !== 'Complete' ? selectedStatus.message : 'Task Completion requested',
       task,
     });
   } catch (error) {
