@@ -55,22 +55,16 @@ exports.getLateLoginsForToday = async (req, res) => {
     const allLateEmployeeDetails = lateAttendances
       .filter(att => {
         if (!att.shift || !att.sessions || !att.sessions.length === 0) return false;
-
         const checkInTime = new Date(att.sessions[0].checkIn);
         const [shiftHour, shiftMinute] = att.shift.startTime.split(':').map(Number);
-        
         const timeOptions = { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false };
         const formatter = new Intl.DateTimeFormat('en-US', timeOptions);
         const parts = formatter.formatToParts(checkInTime);
-        
         const checkInHourIST = parseInt(parts.find(p => p.type === 'hour').value);
         const checkInMinuteIST = parseInt(parts.find(p => p.type === 'minute').value);
-
         const isLate = checkInHourIST > shiftHour || (checkInHourIST === shiftHour && checkInMinuteIST > shiftMinute);
 
-        if (!isLate) {
-            return false;
-        }
+        if (!isLate) { return false; }
         
         const hasValidPermission = att.permissions.some(permission => {
             const [fromHour, fromMin] = permission.fromTime.split(':').map(Number);
@@ -89,14 +83,7 @@ exports.getLateLoginsForToday = async (req, res) => {
         return {
             _id: att.employee._id,
             name: att.employee.name,
-            // ================= THIS IS THE FIX =================
-            loginTime: loginTimeDate.toLocaleTimeString('en-IN', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                hour12: true, 
-                timeZone: 'Asia/Kolkata' 
-            }),
-            // ===================================================
+            loginTime: loginTimeDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }),
             rawLoginTime: loginTimeDate,
             shiftStartTime: att.shift.startTime
         };
@@ -110,23 +97,37 @@ exports.getLateLoginsForToday = async (req, res) => {
         }
     });
 
+    // ================== THIS SECTION IS UPDATED ==================
     const finalResult = Array.from(uniqueLatestLogins.values()).map(emp => {
-      const [shiftHour, shiftMinute] = emp.shiftStartTime.split(':').map(Number);
-      const shiftStartDateTime = new Date(emp.rawLoginTime);
-      shiftStartDateTime.setHours(shiftHour, shiftMinute, 0, 0);
+      // 1. Get the date parts (YYYY-MM-DD) of the login in the correct IST timezone.
+      // 'en-CA' locale reliably gives the YYYY-MM-DD format.
+      const dateOptions = { timeZone: 'Asia/Kolkata' };
+      const isoDateString = emp.rawLoginTime.toLocaleDateString('en-CA', dateOptions);
+
+      // 2. Construct an ISO 8601 string for the shift start time *in IST*.
+      const shiftStartTimeString = `${isoDateString}T${emp.shiftStartTime}:00.000+05:30`;
+      
+      // 3. Create a reliable Date object from this string. It now correctly represents 09:30 IST.
+      const shiftStartDateTime = new Date(shiftStartTimeString);
+
       let lateByMins = 0;
-      if (emp.rawLoginTime > shiftStartDateTime) {
-          const diffMs = emp.rawLoginTime - shiftStartDateTime;
+      // 4. Compare the two universal timestamps. This is now an accurate comparison.
+      if (emp.rawLoginTime.getTime() > shiftStartDateTime.getTime()) {
+          const diffMs = emp.rawLoginTime.getTime() - shiftStartDateTime.getTime();
           lateByMins = Math.floor(diffMs / (1000 * 60));
       }
+
+      // Format the duration string
       const hours = Math.floor(lateByMins / 60);
       const minutes = lateByMins % 60;
       let lateByFormatted = '';
       if (hours > 0) lateByFormatted += `${hours} hr `;
-      if (minutes > 0 || hours === 0) lateByFormatted += `${minutes} mins`;
+      if (minutes > 0 || lateByMins === 0) lateByFormatted += `${minutes} mins`;
+      
       const { rawLoginTime, ...rest } = emp;
       return { ...rest, lateBy: lateByFormatted.trim() };
     });
+    // ==========================================================
 
     res.status(200).json({
       success: true,
