@@ -5,10 +5,10 @@ const Attendance = require('../../models/masterModels/Attendance'); // Make sure
 const Shift = require('../../models/masterModels/Shift');       // Make sure the path is correct
 const mongoose = require('mongoose');
 
+// REPLACE THIS with the actual ObjectId of your "Approved" status
 const APPROVED_PERMISSION_STATUS_ID = new mongoose.Types.ObjectId("68b6a2610c502941d03c6372");
 
 const getStartOfDayISTAsUTC = (date = new Date()) => {
-  // ... (no changes to this helper function)
   const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric' };
   const formatter = new Intl.DateTimeFormat('en-US', options);
   const parts = formatter.formatToParts(date);
@@ -23,7 +23,6 @@ exports.getLateLoginsForToday = async (req, res) => {
     const today = getStartOfDayISTAsUTC(new Date());
 
     const lateAttendances = await Attendance.aggregate([
-      // ... (no changes to the aggregation pipeline)
       { $addFields: { localDate: { $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: "Asia/Kolkata" } } } },
       { $match: { localDate: today.toISOString().split('T')[0] } },
       { $lookup: { from: 'employees', localField: 'employeeId', foreignField: '_id', as: 'employee' } },
@@ -61,12 +60,17 @@ exports.getLateLoginsForToday = async (req, res) => {
         const [shiftHour, shiftMinute] = att.shift.startTime.split(':').map(Number);
         
         // ======================= THIS IS THE FIX =======================
-        // Compare hours and minutes directly to ignore seconds.
-        // An employee is only late if their login MINUTE is AFTER the shift MINUTE.
-        const checkInHour = checkInTime.getHours();
-        const checkInMinute = checkInTime.getMinutes();
+        // Use Intl.DateTimeFormat to get the hour and minute in the correct IST timezone,
+        // regardless of the server's location.
+        const timeOptions = { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false };
+        const formatter = new Intl.DateTimeFormat('en-US', timeOptions);
+        const parts = formatter.formatToParts(checkInTime);
+        
+        const checkInHourIST = parseInt(parts.find(p => p.type === 'hour').value);
+        const checkInMinuteIST = parseInt(parts.find(p => p.type === 'minute').value);
 
-        const isLate = checkInHour > shiftHour || (checkInHour === shiftHour && checkInMinute > shiftMinute);
+        // Compare using the correct IST values
+        const isLate = checkInHourIST > shiftHour || (checkInHourIST === shiftHour && checkInMinuteIST > shiftMinute);
         // ===============================================================
 
         if (!isLate) {
@@ -86,7 +90,6 @@ exports.getLateLoginsForToday = async (req, res) => {
         return isLate && !hasValidPermission;
       })
       .map(att => {
-        // ... (The rest of the mapping logic is unchanged)
         const loginTimeDate = new Date(att.sessions[0].checkIn);
         return {
             _id: att.employee._id,
@@ -97,7 +100,6 @@ exports.getLateLoginsForToday = async (req, res) => {
         };
       });
 
-    // ... (The de-duplication and final formatting logic are unchanged)
     const uniqueLatestLogins = new Map();
     allLateEmployeeDetails.forEach(employee => {
         const existingEntry = uniqueLatestLogins.get(employee._id.toString());
