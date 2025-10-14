@@ -70,7 +70,7 @@ exports.addMembersToGroup = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized: Only group admins can add members." });
     }
 
-    // --- Logic (No changes here) ---
+    // --- Logic ---
     const updatedGroup = await Group.findByIdAndUpdate(
       groupId,
       { $addToSet: { members: { $each: memberIds } } },

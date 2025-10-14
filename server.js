@@ -25,6 +25,15 @@ require('dotenv').config();
 // app.post('/api/chatWithGemini', (req,res)=>{
 //   console.log(req.body,"req.body")
 // })
+app.get('/privacy', (req, res) => {
+  res.send(`
+    <h1>Privacy Policy</h1>
+    <p>We collect and process data such as employee names, phone numbers, email addresses, and task details.</p>
+    <p>This data is used solely for notifying employees about assigned tasks via WhatsApp and for internal task management purposes.</p>
+    <p>We do not share, sell, or distribute this information to third parties.</p>
+    <p>If you wish to opt-out or request data deletion, please contact privacy@yourdomain.com.</p>
+  `);
+});
 app.use('/api', authRoutes);
 app.use('/api', checkLogin, masterRoutes);
 app.use('/api', mainRoutes);
