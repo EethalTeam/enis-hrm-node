@@ -31,7 +31,7 @@ app.get('/privacy', (req, res) => {
     <p>We collect and process data such as employee names, phone numbers, email addresses, and task details.</p>
     <p>This data is used solely for notifying employees about assigned tasks via WhatsApp and for internal task management purposes.</p>
     <p>We do not share, sell, or distribute this information to third parties.</p>
-    <p>If you wish to opt-out or request data deletion, please contact privacy@yourdomain.com.</p>
+    <p>If you wish to opt-out or request data deletion, please contact eethalnaditsolutions@gmail.com.</p>
   `);
 });
 app.use('/api', authRoutes);
