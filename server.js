@@ -10,6 +10,7 @@ const mainRoutes = require('./routes/mainRoutes');
 const authRoutes = require('./routes/authRoutes');
 const Notification = require('./models/masterModels/Notifications');
 const Group = require('./models/masterModels/Group');
+const Message = require('./models/masterModels/Message');
 const { logoutUser } = require('./controllers/masterControllers/EmployeeControllers');
 const { autoCheckoutOnDisconnect } = require('./controllers/masterControllers/AttendanceControllers');
 const { checkLogin } = require('./controllers/masterControllers/EmployeeControllers');
@@ -54,7 +55,7 @@ const employeeSockets = new Map();       // employeeId -> Set of socketIds
 io.on("connection", (socket) => {
   console.log("⚡ A client connected:", socket.id);
 
-  // ================== Join Room ==================
+  // ================== Join Room for Personal Notifications ==================
   socket.on("joinRoom", ({ employeeId }) => {
     socket.employeeId = employeeId;
     socket.join(employeeId);
@@ -64,9 +65,31 @@ io.on("connection", (socket) => {
     }
     employeeSockets.get(employeeId).add(socket.id);
 
-    console.log(`Socket ${socket.id} joined room: ${employeeId}`);
+    console.log(`Socket ${socket.id} joined personal room: ${employeeId}`);
+  });
+  
+  // ================== NEW: GROUP CHAT EVENTS ==================
+  // 1. Event for a user to join a specific group chat room
+  socket.on("join_group_chat", (groupId) => {
+    socket.join(groupId);
+    console.log(`Socket ${socket.id} joined group chat room: ${groupId}`);
   });
 
+  // 2. Event for a user to leave a group chat room
+  socket.on("leave_group_chat", (groupId) => {
+    socket.leave(groupId);
+    console.log(`Socket ${socket.id} left group chat room: ${groupId}`);
+  });
+
+  // 3. Event for sending a message specifically to a group
+  socket.on("send_group_message", async (messageData) => {
+    if (!messageData.groupId || !messageData.senderId || !messageData.content) {
+      console.error("❌ Invalid group message data received");
+      return;
+    }
+    // Use the dedicated handler for chat messages
+    await handleGroupChatMessage(socket, messageData);
+  });
   // // ================== Heartbeat ==================
   // socket.on("heartbeat", ({ employeeId }) => {
   //   if (!employeeId) return;
@@ -186,6 +209,24 @@ const createNotification = async ({ type, message, fromEmployeeId, toEmployeeId 
   } catch (err) {
     console.error("❌ Error creating notification:", err.message);
     throw err;
+  }
+};
+
+// ---------------- NEW HELPER: HANDLE GROUP CHAT MESSAGE ----------------
+const handleGroupChatMessage = async (socket, { groupId, senderId, content }) => {
+  try {
+    const newMessage = await Message.create({ groupId, senderId, content });
+    const populatedMessage = await newMessage.populate('senderId', 'name avatar');
+    await Group.findByIdAndUpdate(groupId, { lastMessage: newMessage._id });
+
+    // FIX: Use socket.broadcast.to()
+    // This sends the message to everyone in the room EXCEPT the socket that sent it.
+    socket.broadcast.to(groupId).emit('receive_group_message', populatedMessage);
+    
+    console.log(`✅ Message broadcast to group ${groupId}`);
+
+  } catch (err) {
+    console.error("❌ Error handling group chat message:", err.message);
   }
 };
 

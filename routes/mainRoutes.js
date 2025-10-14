@@ -10,10 +10,18 @@ const AIControllers = require('../controllers/masterControllers/AiControllers')
 const GeminiControllers = require('../controllers/masterControllers/GeminiAiControllers')
 const DashBoardControllers = require('../controllers/masterControllers/DashBoardControllers')
 const AttendanceReportControllers = require('../controllers/masterControllers/AttendanceReportControllers')
+const GroupControllers = require('../controllers/masterControllers/GroupControllers')
 
 router.post('/chatWithAI', AIControllers.chatWithAI)
 router.post('/chatWithGemini', GeminiControllers.chatWithGemini)
 router.post('/parseAICommand', GeminiControllers.parseAICommand)
+
+router.post('/Group/createGroup', GroupControllers.createGroup)
+router.post('/Group/AddMembers', GroupControllers.addMembersToGroup)
+router.post('/Group/getMessages', GroupControllers.getGroupMessages)
+router.post('/Group/getGroupByUsers', GroupControllers.getUserGroups)
+router.post('/Group/RemoveMember', GroupControllers.removeMemberFromGroup)
+router.post('/Group/makeMemberAdmin', GroupControllers.makeMemberAdmin)
 
 router.post('/DashBoard/getLateLogins', DashBoardControllers.getLateLoginsForToday)
 

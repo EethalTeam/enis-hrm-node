@@ -7,13 +7,26 @@ const groupSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      unique: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    // (Optional but Recommended) For a group profile picture
+    avatar: {
+      type: String,
+      default: '',
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
       required: true,
     },
+    // (Recommended) To manage who can edit the group, add/remove members, etc.
+    admins: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Employee",
+    }],
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -21,9 +34,10 @@ const groupSchema = new mongoose.Schema(
         required: true,
       }
     ],
-    description: {
-      type: String,
-      trim: true,
+    // (Recommended for Performance) A reference to the last message sent in this group.
+    lastMessage: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message'
     },
     type: {
       type: String,
