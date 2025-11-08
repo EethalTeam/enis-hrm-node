@@ -1,10 +1,18 @@
-// controllers/leadController.js
 const Lead = require('../../models/masterModels/Leads');
 const LeadStatus = require('../../models/masterModels/LeadStatus');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
 const { fetch } = require("undici");
 const xml2js = require("xml2js");
+const csv = require('csv-parser');
+const { google } = require('googleapis');
+const sheets = google.sheets('v4');
+const path = require('path');
+
+const auth = new google.auth.GoogleAuth({
+  keyFile: path.join(__dirname, '../../config/service-account-key.json'), 
+  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+});
 
 // Helper function to get a formatted timestamp for notes
 const getFormattedTimestamp = () => {
@@ -19,23 +27,21 @@ const getFormattedTimestamp = () => {
     });
 };
 
-// Create a new Lead
+// ===================================================================
+// 1. CREATE LEAD (NO CHANGES NEEDED)
 exports.createLead = async (req, res) => {
   try {
     const { notes: newNote, statusId, ...leadData } = req.body;
-    
+
     const lead = new Lead({
         ...leadData,
         statusId: new mongoose.Types.ObjectId(statusId)
     });
 
-    // If an initial note is provided, format it and add it to the notes array
     if (newNote && newNote.trim() !== '') {
-        // Fetch the status name to include in the note
         const statusDoc = await LeadStatus.findById(statusId);
         const statusName = statusDoc ? statusDoc.statusName : 'Unknown Status';
         const timestamp = getFormattedTimestamp();
-
         const formattedNote = `${newNote} - [Status: ${statusName}] - [${timestamp}]`;
         lead.notes.push(formattedNote);
     }
@@ -44,13 +50,16 @@ exports.createLead = async (req, res) => {
     res.status(201).json({ message: 'Lead created successfully', lead });
   } catch (error) {
     console.error(error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Failed to create lead. Company Name must be unique.' });
+    }
     res.status(500).json({ message: 'Failed to create lead', error: error.message });
   }
 };
 
-// Get all Leads (No changes needed here)
+// ===================================================================
+// 2. GET ALL LEADS (NO CHANGES NEEDED)
 exports.getAllLeads = async (req, res) => {
-    // ... This function works as is.
     try {
         const { _id, role } = req.body;
         const filter = {};
@@ -67,14 +76,14 @@ exports.getAllLeads = async (req, res) => {
     }
 };
 
-// Get a single Lead by ID (Minor fix for 'id' variable)
+// ===================================================================
+// 3. GET LEAD BY ID (NO CHANGES NEEDED)
 exports.getLeadById = async (req, res) => {
     try {
         const { _id } = req.body;
         if (!mongoose.Types.ObjectId.isValid(_id)) {
             return res.status(400).json({ message: 'Invalid Lead ID' });
         }
-        // FIX: was using 'id' instead of '_id'
         const lead = await Lead.findById(_id)
             .populate('statusId', 'statusName')
             .populate('assignedTo', 'name email');
@@ -89,7 +98,8 @@ exports.getLeadById = async (req, res) => {
     }
 };
 
-// Update a Lead by ID (This is the main change)
+// ===================================================================
+// 4. UPDATE LEAD (NO CHANGES NEEDED)
 exports.updateLead = async (req, res) => {
   try {
     const { _id, notes: newNote, ...updateData } = req.body;
@@ -105,10 +115,7 @@ exports.updateLead = async (req, res) => {
 
     const updatePayload = { $set: updateData };
 
-    // If a new note is being added, format it and push it to the array
     if (newNote && newNote.trim() !== '') {
-        // Determine the status to use for the note
-        // Use the new statusId if it's being updated, otherwise use the existing one
         const statusToQuery = updateData.statusId || leadToUpdate.statusId;
         const statusDoc = await LeadStatus.findById(statusToQuery);
         const statusName = statusDoc ? statusDoc.statusName : 'Unknown';
@@ -116,7 +123,6 @@ exports.updateLead = async (req, res) => {
         
         const formattedNote = `${newNote} - [Status: ${statusName}] - [${timestamp}]`;
         
-        // Use $push to add the new note to the existing array
         updatePayload.$push = { notes: formattedNote };
     }
 
@@ -127,15 +133,18 @@ exports.updateLead = async (req, res) => {
     res.status(200).json({ message: 'Lead updated successfully', lead: updatedLead });
   } catch (error) {
     console.error(error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Failed to update lead. Company Name must be unique.' });
+    }
     res.status(500).json({ message: 'Failed to update lead', error: error.message });
   }
 };
 
-// Delete a Lead (Minor fix for 'id' variable)
+// ===================================================================
+// 5. DELETE LEAD (NO CHANGES NEEDED)
 exports.deleteLead = async (req, res) => {
     try {
         const { _id } = req.body;
-        // FIX: was using 'id' instead of '_id'
         if (!mongoose.Types.ObjectId.isValid(_id)) {
             return res.status(400).json({ message: 'Invalid Lead ID' });
         }
@@ -154,54 +163,201 @@ exports.deleteLead = async (req, res) => {
     }
 };
 
-// Import Leads (Updated to handle notes array)
+// ===================================================================
+// 6. IMPORT LEADS (THIS IS THE UPDATED FUNCTION)
+
+function parseExcelDate(excelValue) {
+  if (typeof excelValue === 'number') {
+    // It's an Excel serial date number
+    const date = new Date((excelValue - (25567 + 2)) * 86400 * 1000); // 25567 for 1970, +2 for leap year bugs
+    return date;
+  }
+  if (typeof excelValue === 'string') {
+    // It's a string. Try to parse it.
+    // This will handle "YYYY-MM-DD" but might fail on "13FEB(ON)"
+    const date = new Date(excelValue);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  // If it's empty, a bad string, or undefined, return null
+  return null;
+}
+
 exports.importLeads = async (req, res) => {
   try {
-    // ... (file reading logic is the same)
-    if (!req.file) { /* ... */ }
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
     const workbook = XLSX.readFile(req.file.path);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet);
-    if (rows.length === 0) { /* ... */ }
-
-    // ... (row validation logic is the same)
+    const rows = XLSX.utils.sheet_to_json(sheet,{ cellDates: true });
+    if (rows.length === 0) {
+      return res.status(400).json({ message: "The uploaded file is empty" });
+    }
+    
     const leadsToInsert = [];
     const invalidRows = [];
-    rows.forEach((row, index) => {
-        // ...
-        leadsToInsert.push({
-            // ... (other fields are the same)
-            // FIX: If notes exist, put it in an array. Otherwise, create an empty array.
-            notes: row.notes ? [row.notes] : [], 
-            isActive: true
-        });
-    });
+    const LEADSTATUS_ID = new mongoose.Types.ObjectId("68b44de801edf550680e0b6d")
 
-    if (invalidRows.length) { /* ... */ }
+    // --- FIX 1: Get the last lead ONCE, before the loop ---
+    const lastLead = await Lead.findOne({}, {}, { sort: { 'createdAt': -1 } });
+    let nextLeadNumber = 1;
     
+    if (lastLead && lastLead.leadCode) {
+      const lastNumber = parseInt(lastLead.leadCode.replace('LEAD', ''));
+      nextLeadNumber = isNaN(lastNumber) ? 1 : lastNumber + 1;
+    }
+    
+    // --- FIX 2: Use a simple 'for' loop instead of 'forEach' ---
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const index = i;
+
+      // Basic validation
+      if (!row['Name'] || !row['PHONE NUMBER']) {
+          invalidRows.push({ row: index + 2, error: "Missing required fields: Name, Phone Number" });
+          continue; 
+      }
+      
+      // --- FIX 3: Generate the leadCode using the incrementing number ---
+      const leadCode = `LEAD${String(nextLeadNumber).padStart(5, '0')}`;
+      
+      leadsToInsert.push({
+        leadCode: leadCode,
+        leadName: row['Name'] ? row['Name'] : '',
+        leadDate: row['DATE'] ? parseExcelDate(row['DATE']) : '',
+        leadPhoneNumber: row['PHONE NUMBER'] ? row['PHONE NUMBER'] :'',
+        experience: row['Experienced/Fresher'] ? row['Experienced/Fresher'] : '',
+        currentCTC: row['Current CTC'] ? row['Current CTC'] : '',
+        expectedCTC: row['Expected CTC'] ? row['Expected CTC'] : '',
+        appliedTo: row['Applied for'] ? row['Applied for'] : '',
+        currentRole: row['Current Role'] ? row['Current Role'] : '',
+        leadFeedback: row['Feedback'] ? row['Feedback'] : '',
+        interViewDate: row['Interview date'] ? parseExcelDate(row['Interview date']) : '',
+        leadLocation: row['Location'] ? row['Location'] : '',
+        leadComments: row['Comments'] ? row['Comments'] : '',
+        statusId:LEADSTATUS_ID,
+        nextFollowUp: row['FOLLOWUPS'] ? parseExcelDate(row['FOLLOWUPS']) : '',
+        isActive: true
+      });
+      nextLeadNumber++;
+    }
+
+    if (invalidRows.length > 0) {
+        return res.status(400).json({ 
+            message: "Import failed due to invalid data",
+            invalidRows: invalidRows 
+        });
+    }
+
+    if (leadsToInsert.length === 0) {
+        return res.status(400).json({ message: "No valid leads found to import" });
+    }
+
     const insertedLeads = await Lead.insertMany(leadsToInsert);
-    res.status(201).json({ message: `${insertedLeads.length} leads imported successfully`, leads: insertedLeads });
+    res.status(200).json({ message: `${insertedLeads.length} leads imported successfully`, leads: insertedLeads });
+  
   } catch (error) {
     console.error(error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Import failed. One or more company names or lead codes are not unique.' });
+    }
     res.status(500).json({ message: "Failed to import leads", error: error.message });
   }
 };
 
+function extractSheetDetails(url) {
+  const idMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const gidMatch = url.match(/[#&]gid=(\d+)/);
+
+  const spreadsheetId = idMatch ? idMatch[1] : null;
+  const gid = gidMatch ? gidMatch[1] : null;
+
+  return { spreadsheetId, gid };
+}
+
+async function getSheetNameByGid(spreadsheetId, gid) {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: "./config/service-account-key.json",
+    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+  });
+  const client = await auth.getClient();
+  const sheets = google.sheets({ version: "v4", auth: client });
+
+  const res = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = res.data.sheets.find(s => s.properties.sheetId === parseInt(gid));
+
+  return sheet ? sheet.properties.title : null;
+}
+  exports.getLeadsFromGoogleSheet = async (req, res) => {
+  // Allow frontend to pass 'range', default to 'Sheet1'
+  const { spreadsheetlink} = req.body;
+
+  const { spreadsheetId, gid } = extractSheetDetails(spreadsheetlink);
+console.log(spreadsheetId, gid,"spreadsheetId, gid")
+  if (!spreadsheetId) {
+    return res.status(400).json({ message: "Missing 'spreadsheetId' in request body" });
+  }
+let sheetName = "Sheet1";
+    if (gid) {
+      const name = await getSheetNameByGid(spreadsheetId, gid);
+      if (name) sheetName = name;
+    }
+  try {
+    const client = await auth.getClient();
+     const range = `${sheetName}!A1:Z1000`;
+    const sheetResponse = await sheets.spreadsheets.values.get({
+      auth: client,
+      spreadsheetId,
+      range: range,
+    });
+console.log(sheetResponse,"sheetResponse")
+    const rows = sheetResponse.data.values;
+
+    if (!rows || rows.length === 0) {
+        return res.status(404).json({ message: "No data found in sheet." });
+    }
+
+    const header = rows[0];
+    const data = rows.slice(1).map(row => {
+      let obj = {};
+      header.forEach((key, index) => {
+        obj[key] = row[index];
+      });
+      return obj;
+    });
+
+    // =======================================================
+    // 3. SEND RESPONSE TO FRONTEND
+    res.status(200).json({
+        success: true,
+        count: data.length,
+        data: data
+    });
+
+  } catch (error) {
+    console.error("Error fetching Google Sheet:", error.message);
+    res.status(500).json({ message: "Failed to fetch spreadsheet", error: error.message });
+  }
+};
+// ===================================================================
+// 7. GET LEADS FROM INDIAMART (NO CHANGES NEEDED)
 exports.getLeadsFromIndiaMart = async (req, res) =>{
-const MOBILE = 8754573741;   // the mobile/email used in IndiaMART
+const MOBILE = 8754573741;
 const API_KEY = 'mRy2G7Bl7HbCSvep5nGN7liMoVTElTI=' 
- try {
+  try {
     const url = `https://mapi.indiamart.com/wservce/enquiry/listing/${MOBILE}/${API_KEY}/`;
 
-   const response = await fetch(url);
-    const xmlText = await response.text();   // get raw XML
+    const response = await fetch(url);
+    const xmlText = await response.text(); 
     
-    // parse XML → JSON
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(xmlText);
 
-    res.json(result);  // now you’ll see proper JSON
+    res.json(result);
   } catch (error) {
     console.error("❌ Error fetching IndiaMART leads:", error);
     res.status(500).json({ error: "Failed to fetch IndiaMART leads" });

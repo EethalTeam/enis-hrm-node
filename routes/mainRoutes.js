@@ -11,6 +11,7 @@ const GeminiControllers = require('../controllers/masterControllers/GeminiAiCont
 const DashBoardControllers = require('../controllers/masterControllers/DashBoardControllers')
 const AttendanceReportControllers = require('../controllers/masterControllers/AttendanceReportControllers')
 const GroupControllers = require('../controllers/masterControllers/GroupControllers')
+const TicketControllers = require('../controllers/masterControllers/TicketControllers')
 
 router.post('/chatWithAI', AIControllers.chatWithAI)
 router.post('/chatWithGemini', GeminiControllers.chatWithGemini)
@@ -24,6 +25,9 @@ router.post('/Group/RemoveMember', GroupControllers.removeMemberFromGroup)
 router.post('/Group/makeMemberAdmin', GroupControllers.makeMemberAdmin)
 
 router.post('/DashBoard/getLateLogins', DashBoardControllers.getLateLoginsForToday)
+router.post('/DashBoard/getTodayPermissions', DashBoardControllers.getTodaysApprovedPermissions)
+router.post('/DashBoard/getTodayLeaves', DashBoardControllers.getTodaysLeaveEmployees)
+router.post('/DashBoard/getAllAbsentees', DashBoardControllers.getTodaysAbsentees)
 
 router.post('/Attendance/report', AttendanceReportControllers.getMonthlyReport)
 
@@ -65,5 +69,14 @@ router.post('/Leave/createLeave', LeaveRequestController.createLeaveRequest)
 router.post('/Leave/deleteLeave', LeaveRequestController.deleteLeaveRequest)
 router.post('/Leave/updateLeave', LeaveRequestController.updateLeaveRequest)
 router.post('/Leave/getAllLeaves', LeaveRequestController.getAllLeaveRequests)
+
+//Ticket Routes
+router.post('/Ticket/createTicket', TicketControllers.createTicket)
+router.post('/Ticket/getTicketStats', TicketControllers.getTicketStats)
+router.post('/Ticket/updateTicket', TicketControllers.updateTicket)
+router.post('/Ticket/getAllTickets', TicketControllers.getAllTickets)
+router.post('/Ticket/assignTicket', TicketControllers.assignTicket)
+router.post('/Ticket/getTicketOptions', TicketControllers.getTicketOptions)
+router.post('/Ticket/updateTicketStatus', TicketControllers.updateTicketStatus)
 
 module.exports = router;

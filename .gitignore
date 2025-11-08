@@ -8,6 +8,9 @@ yarn-error.log*
 logs/
 *.log
 
+# Google Cloud Credentials
+config/service-account-key.json
+
 # Environment variables
 .env
 

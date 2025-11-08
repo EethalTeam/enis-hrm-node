@@ -4,9 +4,121 @@ const Employee = require('../../models/masterModels/Employee');
 const Attendance = require('../../models/masterModels/Attendance'); // Make sure the path is correct
 const Shift = require('../../models/masterModels/Shift');       // Make sure the path is correct
 const mongoose = require('mongoose');
+const PermissionRequest = require('../../models/masterModels/Permissions');
+const LeaveRequest = require('../../models/masterModels/LeaveRequest');
 
-// REPLACE THIS with the actual ObjectId of your "Approved" status
 const APPROVED_PERMISSION_STATUS_ID = new mongoose.Types.ObjectId("68b6a2610c502941d03c6372");
+
+exports.getTodaysAbsentees = async (req, res) => {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); // Today at 12:00:00 AM
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999); // Today at 11:59:59 PM
+    
+    // 3. Find all employee IDs who are "excused" or "present"
+
+    // Find employees on approved LEAVE today
+    const onLeave = await LeaveRequest.find({
+      RequestStatusId: APPROVED_PERMISSION_STATUS_ID,
+      startDate: { $lte: todayEnd },
+      endDate: { $gte: todayStart }
+    }).select('employeeId');
+
+    // Find employees on approved PERMISSION today
+    const onPermission = await PermissionRequest.find({
+      RequestStatusId: APPROVED_PERMISSION_STATUS_ID,
+      permissionDate: { $gte: todayStart, $lt: todayEnd }
+    }).select('employeeId');
+
+    // Find employees who have LOGGED IN today (have an attendance record)
+    const loggedIn = await Attendance.find({
+      date: { $gte: todayStart, $lt: todayEnd }
+    }).select('employeeId');
+
+    // 4. Create a master list of all employee IDs to exclude
+    const excludedIds = new Set([
+        ...onLeave.map(l => l.employeeId.toString()),
+        ...onPermission.map(p => p.employeeId.toString()),
+        ...loggedIn.map(a => a.employeeId.toString())
+    ]);
+
+    // 5. Find all active employees who are NOT in the excluded list
+    const absentEmployees = await Employee.find({
+      _id: { $nin: [...excludedIds] },
+      isActive: true // Only find currently active employees
+    })
+    .populate('departmentId') // Or 'department' - adjust to your schema
+    .select('name employeeId '); // Select fields you want to show
+
+    res.status(200).json({
+      success: true,
+      count: absentEmployees.length,
+      absentees: absentEmployees
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+exports.getTodaysLeaveEmployees = async (req, res) => {
+  try {
+ 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); 
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999); 
+
+    const leaves = await LeaveRequest.find({
+      RequestStatusId: APPROVED_PERMISSION_STATUS_ID,
+      startDate: { $lte: todayEnd },
+      endDate: { $gte: todayStart }
+    })
+    .populate('employeeId', 'name') 
+    .populate('leaveTypeId') 
+    .sort({ 'employeeId.name': 1 }); 
+
+    res.status(200).json({
+      success: true,
+      count: leaves.length,
+      leaves: leaves
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+exports.getTodaysApprovedPermissions = async (req, res) => {
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1); // Start of tomorrow
+
+    // 3. Find all permissions that are for today AND are approved
+    const permissions = await PermissionRequest.find({
+      permissionDate: {
+        $gte: today,
+        $lt: tomorrow
+      },
+      RequestStatusId: APPROVED_PERMISSION_STATUS_ID
+    })
+    .populate('employeeId', 'name') 
+    .sort({ fromTime: 1 }); // Order them by time
+
+    res.status(200).json({
+      success: true,
+      count: permissions.length,
+      permissions: permissions
+    });
+};
+
 
 const getStartOfDayISTAsUTC = (date = new Date()) => {
   const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric' };

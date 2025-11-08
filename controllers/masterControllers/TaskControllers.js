@@ -2,6 +2,7 @@
 const Task = require("../../models/masterModels/Task");
 const Notification = require('../../models/masterModels/Notifications')
 const Employee = require('../../models/masterModels/Employee')
+const { sendWhatsAppTemplate } = require('../../controllers/masterControllers/WhatsAppControllers')
 
 function getIndiaDateTime() {
   const now = new Date();
@@ -12,7 +13,7 @@ function getIndiaDateTime() {
   return indiaTime; 
 }
 
-// ✅ Create Task
+// ✅ Create Tasks for Multiple Assignees
 exports.createTask = async (req, res) => {
   try {
     const {
@@ -24,51 +25,99 @@ exports.createTask = async (req, res) => {
       dueDate,
       taskStatusId,
       taskPriorityId,
-      assignedTo,
+      assignees,
       createdBy,
       reqLeadCount,
       compLeadCount
     } = req.body;
 
-    // Validation: require taskCode, taskName, projectId
+    // --- 1. Validation ---
     if (!taskName || !projectId) {
       return res.status(400).json({ message: "taskName and projectId are required" });
     }
+    if (!assignees || !Array.isArray(assignees) || assignees.length === 0) {
+      return res.status(400).json({ message: "assignees must be a non-empty array of employee IDs" });
+    }
 
-    const task = new Task({
-      taskCode,
-      taskName,
-      projectId,
-      description,
-      startDate,
-      dueDate,
-      taskStatusId,
-      taskPriorityId,
-      assignedTo,
-      createdBy,
-      reqLeadCount,
-      compLeadCount
-    });
+    // --- 2. Fetch Common Data Once ---
+    const createdEmployee = await Employee.findOne({ _id: createdBy });
+    if (!createdEmployee) {
+      return res.status(404).json({ message: "Creating employee not found" });
+    }
 
-    await task.save();
+    const io = req.app.get("socketio");
+    const createdTasks = [];
+    const notificationErrors = [];
 
-        // 2️⃣ Create a notification for the approver
+    // --- 3. Loop Through Each Assignee and Create a Task ---
+    for (const assigneeId of assignees) {
+      // 3a. Create and save the individual task
+      const task = new Task({
+        taskCode,
+        taskName,
+        projectId,
+        description,
+        startDate,
+        dueDate,
+        taskStatusId,
+        taskPriorityId,
+        assignedTo: assigneeId, // <-- Set the individual assignee here
+        createdBy,
+        reqLeadCount,
+        compLeadCount
+      });
+
+      await task.save();
+      createdTasks.push(task);
+
+      // 3b. Send notifications (wrapped in a try/catch)
+      // This prevents one failed notification from stopping the whole loop
+      try {
+        const assignedEmployee = await Employee.findOne({ _id: assigneeId });
+        if (!assignedEmployee) {
+          console.warn(`Assignee with ID ${assigneeId} not found. Skipping notifications.`);
+          notificationErrors.push({ assigneeId, error: "Assignee not found" });
+          continue; // Move to the next assignee
+        }
+
+        // Send WhatsApp
+        await sendWhatsAppTemplate(
+          "918825556025", // Note: This is hardcoded
+          assignedEmployee.name,
+          createdEmployee.name,
+          description,
+          dueDate
+        );
+
+        // Create DB Notification
         const notification = await Notification.create({
           type: "task-assignment",
           message: "New task is assigned for you",
           fromEmployeeId: createdBy,
-          toEmployeeId: assignedTo,
+          toEmployeeId: assigneeId, // <-- Individual assignee
           status: "unseen",
           meta: {
             taskId: task._id
           }
         });
-        // 3️⃣ Emit notification via Socket.IO
-        const io = req.app.get("socketio");
-        if (io && assignedTo) {
-          io.to(assignedTo.toString()).emit("receiveNotification", notification);
+
+        // Emit Socket.IO Notification
+        if (io && assigneeId) {
+          io.to(assigneeId.toString()).emit("receiveNotification", notification);
         }
-    res.status(201).json({ message: "Task created successfully", task });
+      } catch (notifyError) {
+        console.error(`Failed to send notification for task ${task._id} to user ${assigneeId}:`, notifyError.message);
+        notificationErrors.push({ assigneeId, error: notifyError.message });
+      }
+    } // --- End of loop ---
+
+    // --- 4. Send Final Response ---
+    res.status(201).json({
+      message: "Tasks created successfully and sent to whatsapp",
+      tasks: createdTasks,
+      notificationErrors: notificationErrors
+    });
+
   } catch (error) {
     console.error("Create Task Error:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });

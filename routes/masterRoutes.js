@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' }); // temp folder
+// const multer = require('multer');
+// const upload = multer({ dest: 'uploads/' }); // temp folder
 
 const DepartmentController = require('../controllers/masterControllers/DepartmentControllers')
 const ShiftController = require('../controllers/masterControllers/ShiftControllers')
@@ -116,7 +116,7 @@ router.post('/Lead/deleteLead', LeadController.deleteLead)
 router.post('/Lead/updateLead', LeadController.updateLead)
 router.post('/Lead/getAllLeads', LeadController.getAllLeads)
 router.post('/Lead/getLeadsFromIndiaMart', LeadController.getLeadsFromIndiaMart)
-router.post('/importLeadsExcel', upload.single('file'), LeadController.importLeads);
+router.post('/Lead/getLeadsFromGoogleSheet', LeadController.getLeadsFromGoogleSheet)
 
 //LeadStatus Routes
 router.post('/LeadStatus/createLeadStatus', LeadStatusController.createLeadStatus)

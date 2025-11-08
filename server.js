@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const http = require('http');
 const { Server } = require('socket.io');
+const multer = require('multer');
 
 const masterRoutes = require('./routes/masterRoutes');
 const mainRoutes = require('./routes/mainRoutes');
@@ -14,12 +14,23 @@ const Message = require('./models/masterModels/Message');
 const { logoutUser } = require('./controllers/masterControllers/EmployeeControllers');
 const { autoCheckoutOnDisconnect } = require('./controllers/masterControllers/AttendanceControllers');
 const { checkLogin } = require('./controllers/masterControllers/EmployeeControllers');
+const webhookRoutes = require("./routes/webHookRoutes");
+const LeadController = require('./controllers/masterControllers/LeadControllers'); // Adjust path if needed
+const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 const PORT = 8001;
-
-app.use(bodyParser.json());
 app.use(cors());
+
+app.post('/api/importLeadsExcel', upload.single('file'), LeadController.importLeads);
+
+app.use(express.json());
+// app.use(express.json({
+//   verify: (req, res, buf) => {
+//     req.rawBody = buf; // Save the raw buffer to the request object
+//   }
+// }));
+
 require('dotenv').config();
 
 // app.post('/api/chatWithGemini', (req,res)=>{
@@ -34,6 +45,8 @@ app.get('/privacy', (req, res) => {
     <p>If you wish to opt-out or request data deletion, please contact eethalnaditsolutions@gmail.com.</p>
   `);
 });
+
+app.use("/webhook", webhookRoutes);
 app.use('/api', authRoutes);
 app.use('/api', checkLogin, masterRoutes);
 app.use('/api', mainRoutes);
@@ -44,17 +57,17 @@ app.get('/test', (req, res) => {
 
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
-
 // const io = new Server(server, {
-//   cors: {
-//     origin: "https://enishrm.grss.in",
-//     methods: ["GET", "POST"],
-//     credentials: true
-//   }
+//   cors: { origin: "*" },
 // });
+
+const io = new Server(server, {
+  cors: {
+    origin: "https://enishrm.grss.in",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 app.set("socketio", io);
 
@@ -242,7 +255,7 @@ const handleGroupChatMessage = async (socket, { groupId, senderId, content }) =>
 // ---------------- MONGODB CONNECTION ----------------
 async function main() {
   try {
-    await mongoose.connect('mongodb+srv://eethaldev:eethaldevteam123@goldsun.pazhgof.mongodb.net/enis-hrm?retryWrites=true&w=majority&appName=ENIS-HRM', {
+    await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 30000,
