@@ -12,6 +12,7 @@ const UserRights = require('../../models/masterModels/UserRights')
 const MenuRegistry = require('../../models/masterModels/MenuRegistry')
 const RoleBased = require("../../models/masterModels/RBAC")
 const LeaveBalance = require("../../models/masterModels/LeaveBalance");
+const {autoCheckoutOnDisconnect} = require("../masterControllers/AttendanceControllers")
 
 // CREATE Employee + LeaveBalance
 exports.createEmployee = async (req, res) => {
@@ -416,6 +417,39 @@ exports.logoutUser = async (employeeId) => {
 
   } catch (err) {
     console.error("❌ Error logging out user:", err.message);
+  }
+};
+
+exports.cronJobLogOut = async (req, res) => {
+  try {
+    // Get all employees currently logged in
+    const loggedInEmployees = await Employee.find({ isCurrentlyLoggedIn: true });
+
+    if (loggedInEmployees.length === 0) {
+      console.log("✅ No logged-in employees found at logout time.");
+      return res.status(200).json({ message: "No logged-in employees found." });
+    }
+
+    // Iterate through each logged-in employee
+    for (const employee of loggedInEmployees) {
+      await autoCheckoutOnDisconnect(employee._id);
+
+      employee.isCurrentlyLoggedIn = false;
+      employee.lastLoggedIn = new Date();
+      await employee.save();
+    }
+
+    console.log(`🕖 Cron job logout executed: ${loggedInEmployees.length} employees logged out.`);
+
+    return res.status(200).json({
+      message: `${loggedInEmployees.length} employees logged out and auto-checked out successfully.`,
+    });
+  } catch (error) {
+    console.error("❌ Error during cron job logout:", error);
+    return res.status(500).json({
+      message: "Internal Server Error during cron job logout.",
+      error: error.message,
+    });
   }
 };
 

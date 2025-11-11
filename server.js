@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const multer = require('multer');
+const cron = require("node-cron");
 
 const masterRoutes = require('./routes/masterRoutes');
 const mainRoutes = require('./routes/mainRoutes');
@@ -11,7 +12,7 @@ const authRoutes = require('./routes/authRoutes');
 const Notification = require('./models/masterModels/Notifications');
 const Group = require('./models/masterModels/Group');
 const Message = require('./models/masterModels/Message');
-const { logoutUser } = require('./controllers/masterControllers/EmployeeControllers');
+const { logoutUser, cronJobLogOut } = require('./controllers/masterControllers/EmployeeControllers');
 const { autoCheckoutOnDisconnect } = require('./controllers/masterControllers/AttendanceControllers');
 const { checkLogin } = require('./controllers/masterControllers/EmployeeControllers');
 const webhookRoutes = require("./routes/webHookRoutes");
@@ -47,14 +48,26 @@ app.get('/privacy', (req, res) => {
 });
 
 app.use("/webhook", webhookRoutes);
+app.post('/getAllCallLogs', LeadController.handleGenericWebhook)
 app.use('/api', authRoutes);
 app.use('/api', checkLogin, masterRoutes);
-app.use('/api', mainRoutes);
+app.use('/api',checkLogin, mainRoutes);
 
 app.get('/test', (req, res) => {
   res.send("Testing mongo db url", process.env.MONGODB_URI);
 });
 
+// Schedule: Every day at 7:00 PM IST
+cron.schedule(
+  "0 19 * * *",
+  async() => {
+    console.log("🕖 Running daily cron job at 7 PM IST:", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }));
+    await cronJobLogOut()
+  },
+  {
+    timezone: "Asia/Kolkata", 
+  }
+);
 const server = http.createServer(app);
 
 // const io = new Server(server, {

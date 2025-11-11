@@ -343,6 +343,44 @@ console.log(sheetResponse,"sheetResponse")
     res.status(500).json({ message: "Failed to fetch spreadsheet", error: error.message });
   }
 };
+
+exports.handleGenericWebhook = async (req, res) => {
+  try {
+    // 1. --- Log the Incoming Data ---
+    // This is the most important step. Check your server's
+    // terminal to see the exact JSON structure.
+    console.log('--- NEW WEBHOOK RECEIVED ---');
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers); // Good to log this too
+    console.log('------------------------------');
+
+    // 2. --- Send Immediate Success Response ---
+    // Always send a 200 OK response as fast as possible.
+    // This tells the third-party service (like Telecmi)
+    // that you successfully received the data.
+    res.status(200).send('Webhook received and logged.');
+
+    // 3. --- Process the Data (TODO) ---
+    // Now that the response is sent, you can safely work
+    // with the data without timing out the webhook.
+
+    // TODO:
+    // Based on the console log, destructure req.body here
+    // const { cmiuuid, from, to, status } = req.body;
+
+    // TODO:
+    // Save the destructured data to your database
+    // await CallLog.create({ ... });
+
+  } catch (error) {
+    // This will only catch errors in your *logging* or *response*
+    // If an error happens in the "TODO" section, the webhook
+    // provider won't know, which is often what you want.
+    console.error('Error handling webhook:', error.message);
+    res.status(500).send('Error processing webhook.');
+  }
+};
+
 // ===================================================================
 // 7. GET LEADS FROM INDIAMART (NO CHANGES NEEDED)
 exports.getLeadsFromIndiaMart = async (req, res) =>{
