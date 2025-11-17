@@ -56,74 +56,19 @@ const fetchTelecmiData = async (endpoint, body, token) => {
 
 exports.fetchAllCallLogs = async (req, res) => {
   try {
-    // --- 1. GET THE TOKEN FIRST ---
-    const userToken = await getTelecmiToken();
-    console.log(userToken,"userToken")
-    if (!userToken) {
-      throw new Error('Failed to authenticate with Telecmi');
+    if (!req.body) {
+      console.log('Webhook received, but no body (JSON data) was found.');
+      return res.status(400).send('No data received.');
     }
-    console.log('Successfully got token, now fetching logs...');
 
-    // 2. Set the date range
-    const toTimestamp = Date.now();
-    const fromTimestamp = toTimestamp - 7 * 24 * 60 * 60 * 1000;
+    console.log('--- NEW TELECMI CALL LOG RECEIVED (from Webhook) ---');
+    console.log(JSON.stringify(req.body, null, 2));
+    console.log('----------------------------------------------------');
 
-    // 3. Define the API request body (WITHOUT the token)
-    const requestBody = {
-      from: fromTimestamp,
-      to: toTimestamp,
-      page: 1,
-      limit: 10,
-    };
-
-    // 4. Make calls in parallel, passing the token
-    const [
-      incomingAnswered,
-      incomingMissed,
-      outgoingAnswered,
-      outgoingMissed,
-    ] = await Promise.all([
-      fetchTelecmiData('in_cdr', { ...requestBody, type: 1 }, userToken),
-      fetchTelecmiData('in_cdr', { ...requestBody, type: 0 }, userToken),
-      fetchTelecmiData('out_cdr', { ...requestBody, type: 1 }, userToken),
-      fetchTelecmiData('out_cdr', { ...requestBody, type: 0 }, userToken),
-    ]);
-
-console.log(incomingAnswered,"incomingAnswered")
-console.log(incomingMissed,"incomingMissed")
-console.log(outgoingAnswered,"outgoingAnswered")
-console.log(outgoingMissed,"outgoingMissed")
-    const allCalls = [
-      ...(incomingAnswered.cdr || []),
-      ...(incomingMissed.cdr || []),
-      ...(outgoingAnswered.cdr || []),
-      ...(outgoingMissed.cdr || []),
-    ];
-
-    allCalls.sort((a, b) => b.time - a.time);
-const TELECMI_APP_ID = 33336639;
-const TELECMI_APP_SECRET = 'd18ce16a-5b80-49be-b682-072eaf3e85b7';
-const callsWithRecording = allCalls.map(call => {
-      let recordingUrl = null;
-      // Check if a filename exists
-      if (call.filename) {
-        recordingUrl = `https://rest.telecmi.com/v2/play?appid=${TELECMI_APP_ID}&secret=${TELECMI_APP_SECRET}&file=${call.filename}`;
-      }
-      
-      return {
-        ...call,
-        recordingUrl: recordingUrl // Add the new URL
-      };
-    });
-    res.status(200).json({
-      success: true,
-      count: allCalls.length,
-      calls: allCalls,
-      calls: callsWithRecording,
-    });
+    res.status(200).json({ success: true, message: "Webhook received." });
 
   } catch (error) {
-    console.error('Error in fetchAllCallLogs:', error.message);
-    res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+    console.error('Error in Telecmi webhook controller:', error.message);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
