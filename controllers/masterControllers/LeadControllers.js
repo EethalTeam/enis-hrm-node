@@ -345,6 +345,7 @@ console.log(sheetResponse,"sheetResponse")
 };
 
 exports.handleGenericWebhook = async (req, res) => {
+  console.log("entered into api")
   try {
     // 1. --- Log the Incoming Data ---
     // This is the most important step. Check your server's
@@ -358,7 +359,7 @@ exports.handleGenericWebhook = async (req, res) => {
     // Always send a 200 OK response as fast as possible.
     // This tells the third-party service (like Telecmi)
     // that you successfully received the data.
-    res.status(200).send('Webhook received and logged.');
+    res.status(200).send("web hook received and logged");
 
     // 3. --- Process the Data (TODO) ---
     // Now that the response is sent, you can safely work

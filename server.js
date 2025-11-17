@@ -16,7 +16,8 @@ const { logoutUser, cronJobLogOut } = require('./controllers/masterControllers/E
 const { autoCheckoutOnDisconnect } = require('./controllers/masterControllers/AttendanceControllers');
 const { checkLogin } = require('./controllers/masterControllers/EmployeeControllers');
 const webhookRoutes = require("./routes/webHookRoutes");
-const LeadController = require('./controllers/masterControllers/LeadControllers'); // Adjust path if needed
+const LeadController = require('./controllers/masterControllers/LeadControllers');
+const CallLogController=require('./controllers/masterControllers/callLogControllers')
 const upload = multer({ dest: 'uploads/' });
 
 const app = express();
@@ -37,6 +38,7 @@ require('dotenv').config();
 // app.post('/api/chatWithGemini', (req,res)=>{
 //   console.log(req.body,"req.body")
 // })
+app.get('/api/calls/fetch-all', CallLogController.fetchAllCallLogs);
 app.get('/privacy', (req, res) => {
   res.send(`
     <h1>Privacy Policy</h1>
@@ -48,7 +50,7 @@ app.get('/privacy', (req, res) => {
 });
 
 app.use("/webhook", webhookRoutes);
-app.post('/getAllCallLogs', LeadController.handleGenericWebhook)
+app.use('/getAllCallLogs', LeadController.handleGenericWebhook)
 app.use('/api', authRoutes);
 app.use('/api', checkLogin, masterRoutes);
 app.use('/api',checkLogin, mainRoutes);
