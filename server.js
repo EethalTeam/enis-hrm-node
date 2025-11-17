@@ -38,7 +38,7 @@ require('dotenv').config();
 // app.post('/api/chatWithGemini', (req,res)=>{
 //   console.log(req.body,"req.body")
 // })
-app.get('/api/calls/fetch-all', CallLogController.fetchAllCallLogs);
+app.post('/api/calls/fetch-all', CallLogController.fetchAllCallLogs);
 app.get('/privacy', (req, res) => {
   res.send(`
     <h1>Privacy Policy</h1>
