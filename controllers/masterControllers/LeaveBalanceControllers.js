@@ -7,20 +7,25 @@ exports.createLeaveBalance = async (req, res) => {
     const { employeeId, leaveBalances } = req.body;
 
     if (!employeeId || !leaveBalances) {
-      return res.status(400).json({ message: "employeeId and leaveBalances are required" });
+      return res
+        .status(400)
+        .json({ message: "employeeId and leaveBalances are required" });
     }
 
     const newLeaveBalance = new LeaveBalance({
       employeeId,
-      leaveBalances: leaveBalances.map(lb => ({
+      leaveBalances: leaveBalances.map((lb) => ({
         leaveTypeId: lb.leaveTypeId,
         totalAllocated: lb.totalAllocated,
-        remaining: lb.remaining || 0
-      }))
+        remaining: lb.remaining || 0,
+      })),
     });
 
     const savedLeaveBalance = await newLeaveBalance.save();
-    res.status(201).json({ message: "LeaveBalance created successfully", data: savedLeaveBalance });
+    res.status(201).json({
+      message: "LeaveBalance created successfully",
+      data: savedLeaveBalance,
+    });
   } catch (error) {
     console.error("Error creating LeaveBalance:", error);
     res.status(500).json({ message: "Internal Server Error", error });
@@ -31,12 +36,25 @@ exports.createLeaveBalance = async (req, res) => {
 exports.getAllLeaveBalances = async (req, res) => {
   try {
     const leaveBalances = await LeaveBalance.find()
-      .populate("employeeId leaveBalances.leaveTypeId");
+      .populate({
+        path: "employeeId",
+        match: { isActive: true },
+      })
+      .populate("leaveBalances.leaveTypeId");
 
-    res.status(200).json(leaveBalances);
+    // Remove inactive/null employees
+    const filteredLeaveBalances = leaveBalances.filter(
+      (item) => item.employeeId !== null,
+    );
+
+    res.status(200).json(filteredLeaveBalances);
   } catch (error) {
     console.error("Error fetching LeaveBalances:", error);
-    res.status(500).json({ message: "Internal Server Error", error });
+
+    res.status(500).json({
+      message: "Internal Server Error",
+      error,
+    });
   }
 };
 
@@ -45,8 +63,9 @@ exports.getLeaveBalanceById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const leaveBalance = await LeaveBalance.findById(id)
-      .populate("employeeId leaveBalances.leaveTypeId");
+    const leaveBalance = await LeaveBalance.findById(id).populate(
+      "employeeId leaveBalances.leaveTypeId",
+    );
 
     if (!leaveBalance) {
       return res.status(404).json({ message: "LeaveBalance not found" });
@@ -69,21 +88,24 @@ exports.updateLeaveBalance = async (req, res) => {
       {
         ...(employeeId && { employeeId }),
         ...(leaveBalances && {
-          leaveBalances: leaveBalances.map(lb => ({
+          leaveBalances: leaveBalances.map((lb) => ({
             leaveTypeId: lb.leaveTypeId,
             totalAllocated: lb.totalAllocated,
-            remaining: lb.remaining || 0
-          }))
-        })
+            remaining: lb.remaining || 0,
+          })),
+        }),
       },
-      { new: true }
+      { new: true },
     ).populate("employeeId leaveBalances.leaveTypeId");
 
     if (!updatedLeaveBalance) {
       return res.status(404).json({ message: "LeaveBalance not found" });
     }
 
-    res.status(200).json({ message: "LeaveBalance updated successfully", data: updatedLeaveBalance });
+    res.status(200).json({
+      message: "LeaveBalance updated successfully",
+      data: updatedLeaveBalance,
+    });
   } catch (error) {
     console.error("Error updating LeaveBalance:", error);
     res.status(500).json({ message: "Internal Server Error", error });

@@ -12,13 +12,18 @@ const mongoose = require("mongoose");
  */
 const getStartOfDayISTAsUTC = (date = new Date()) => {
   // Use the standard Intl.DateTimeFormat API for robust timezone handling
-  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric' };
-  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const options = {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  };
+  const formatter = new Intl.DateTimeFormat("en-US", options);
   const parts = formatter.formatToParts(date);
 
-  const year = parseInt(parts.find(p => p.type === 'year').value);
-  const month = parseInt(parts.find(p => p.type === 'month').value);
-  const day = parseInt(parts.find(p => p.type === 'day').value);
+  const year = parseInt(parts.find((p) => p.type === "year").value);
+  const month = parseInt(parts.find((p) => p.type === "month").value);
+  const day = parseInt(parts.find((p) => p.type === "day").value);
 
   // Create a new Date object using UTC values.
   // The month for Date.UTC is 0-indexed, so we subtract 1.
@@ -31,7 +36,7 @@ exports.checkIn = async (req, res) => {
   try {
     const { employeeId } = req.body;
     const now = new Date();
-    
+
     // FIX: Use the new, correct helper function
     const today = getStartOfDayISTAsUTC(now);
 
@@ -47,7 +52,9 @@ exports.checkIn = async (req, res) => {
     } else {
       const lastSession = attendance.sessions[attendance.sessions.length - 1];
       if (lastSession && !lastSession.checkOut) {
-        return res.status(400).json({ message: "Already checked in. Please check out first." });
+        return res
+          .status(400)
+          .json({ message: "Already checked in. Please check out first." });
       }
       attendance.sessions.push({ checkIn: now });
     }
@@ -56,7 +63,7 @@ exports.checkIn = async (req, res) => {
     await Employee.findByIdAndUpdate(
       employeeId,
       { statusId: "68d115c6c8cbfdb2d70af549" }, // Assuming this is 'Online' status
-      { new: true }
+      { new: true },
     );
     res.status(200).json({ message: "Checked in successfully", attendance });
   } catch (error) {
@@ -70,13 +77,15 @@ exports.checkOut = async (req, res) => {
   try {
     const { employeeId } = req.body;
     const now = new Date();
-    
+
     // FIX: Use the new, correct helper function
     const today = getStartOfDayISTAsUTC(now);
     const attendance = await Attendance.findOne({ employeeId, date: today });
 
     if (!attendance) {
-      return res.status(404).json({ message: "No attendance record found for today" });
+      return res
+        .status(404)
+        .json({ message: "No attendance record found for today" });
     }
 
     const lastSession = attendance.sessions[attendance.sessions.length - 1];
@@ -92,14 +101,14 @@ exports.checkOut = async (req, res) => {
     // Recalculate totals
     attendance.totalWorkedHours = attendance.sessions.reduce(
       (sum, s) => sum + (s.workedHours || 0),
-      0
+      0,
     );
 
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
       { statusId: "68d115cec8cbfdb2d70af54e" }, // Assuming this is 'Offline' status
-      { new: true }
+      { new: true },
     );
     res.status(200).json({ message: "Checked out successfully", attendance });
   } catch (error) {
@@ -113,24 +122,30 @@ exports.startBreak = async (req, res) => {
   try {
     const { employeeId } = req.body;
     const now = new Date();
-    
+
     // FIX: Use the new, correct helper function
     const today = getStartOfDayISTAsUTC(now);
     let attendance = await Attendance.findOne({ employeeId, date: today });
-    
+
     if (!attendance) {
-      return res.status(404).json({ message: "Attendance record not found for today" });
+      return res
+        .status(404)
+        .json({ message: "Attendance record not found for today" });
     }
 
     // ... (rest of the code is fine)
     const session = attendance.sessions[attendance.sessions.length - 1];
     if (!session || session.checkOut) {
-        return res.status(400).json({ message: "No active session to start a break" });
+      return res
+        .status(400)
+        .json({ message: "No active session to start a break" });
     }
 
     const lastBreak = session.breaks[session.breaks.length - 1];
     if (lastBreak && !lastBreak.breakEnd) {
-      return res.status(400).json({ message: "Already on a break. Please end it first." });
+      return res
+        .status(400)
+        .json({ message: "Already on a break. Please end it first." });
     }
 
     session.breaks.push({ breakStart: now });
@@ -139,7 +154,7 @@ exports.startBreak = async (req, res) => {
     await Employee.findByIdAndUpdate(
       employeeId,
       { statusId: "68d115e5c8cbfdb2d70af553" }, // Assuming 'On Break'
-      { new: true }
+      { new: true },
     );
     res.json({
       success: true,
@@ -147,7 +162,9 @@ exports.startBreak = async (req, res) => {
       breakStart: now,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error starting break", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error starting break", error: error.message });
   }
 };
 
@@ -156,18 +173,20 @@ exports.endBreak = async (req, res) => {
   try {
     const { employeeId } = req.body;
     const now = new Date();
-    
+
     // FIX: Use the new, correct helper function
     const today = getStartOfDayISTAsUTC(now);
     let attendance = await Attendance.findOne({ employeeId, date: today });
-    
+
     if (!attendance) {
-      return res.status(404).json({ message: "Attendance record not found for today" });
+      return res
+        .status(404)
+        .json({ message: "Attendance record not found for today" });
     }
 
     // ... (rest of the code is fine)
     const session = attendance.sessions[attendance.sessions.length - 1];
-     if (!session || !session.breaks.length) {
+    if (!session || !session.breaks.length) {
       return res.status(400).json({ message: "No active break to end" });
     }
 
@@ -182,19 +201,19 @@ exports.endBreak = async (req, res) => {
 
     session.totalBreakHours = session.breaks.reduce(
       (sum, b) => sum + (b.breakDuration || 0),
-      0
+      0,
     );
 
     attendance.totalBreakHours = attendance.sessions.reduce(
       (sum, s) => sum + (s.totalBreakHours || 0),
-      0
+      0,
     );
 
     await attendance.save();
     await Employee.findByIdAndUpdate(
       employeeId,
       { statusId: "68d115c6c8cbfdb2d70af549" }, // Back to 'Online'
-      { new: true }
+      { new: true },
     );
     res.json({
       success: true,
@@ -202,7 +221,9 @@ exports.endBreak = async (req, res) => {
       breakEnd: now,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error ending break", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error ending break", error: error.message });
   }
 };
 
@@ -221,15 +242,15 @@ exports.autoCheckoutOnDisconnect = async (employeeId) => {
       const checkOutTime = new Date();
       const elapsedMs = checkOutTime - new Date(lastSession.checkIn);
       const workedHours = elapsedMs / (1000 * 60 * 60);
-      
+
       lastSession.checkOut = checkOutTime;
       lastSession.workedHours = workedHours;
 
       attendance.totalWorkedHours = attendance.sessions.reduce(
         (sum, s) => sum + (s.workedHours || 0),
-        0
+        0,
       );
-      
+
       await attendance.save();
     }
   } catch (error) {
@@ -252,7 +273,9 @@ exports.getAttendanceByDate = async (req, res) => {
     res.status(200).json(attendance);
   } catch (error) {
     console.error("Get attendance error:", error);
-    res.status(500).json({ message: "Failed to get attendance", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get attendance", error: error.message });
   }
 };
 
@@ -265,7 +288,10 @@ exports.getAttendanceByEmployee = async (req, res) => {
     res.status(200).json(records);
   } catch (error) {
     console.error("Get employee attendance error:", error);
-    res.status(500).json({ message: "Failed to get employee attendance", error: error.message });
+    res.status(500).json({
+      message: "Failed to get employee attendance",
+      error: error.message,
+    });
   }
 };
 
@@ -273,27 +299,31 @@ exports.getAttendanceByEmployee = async (req, res) => {
 exports.getAllAttendanceByDate = async (req, res) => {
   try {
     const { date, _id, role } = req.body;
-    
+
     // Convert the input date to start of day in IST
     const inputDate = new Date(date);
     const queryDate = getStartOfDayISTAsUTC(inputDate);
-    
+
     // Build query based on user role
     let query = { date: queryDate };
-    
-    if (role !== 'Super Admin' && role !== 'Admin') {
+
+    if (role !== "Super Admin" && role !== "Admin") {
       // Add role-based filtering here if needed
     }
 
     const attendance = await Attendance.find(query)
-      .populate('employeeId', 'name department employeeId status')
-      .sort({ 'employeeId.name': 1 });
+      .populate("employeeId", "name department employeeId status")
+      .sort({ "employeeId.name": 1 });
 
     // Ensure all records have calculated totals
-    const processedAttendance = attendance.map(record => {
-      const totalWorkedHours = record.totalWorkedHours ?? record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
-      const totalBreakHours = record.totalBreakHours ?? record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
-      
+    const processedAttendance = attendance.map((record) => {
+      const totalWorkedHours =
+        record.totalWorkedHours ??
+        record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
+      const totalBreakHours =
+        record.totalBreakHours ??
+        record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
+
       return {
         ...record.toObject(),
         totalWorkedHours,
@@ -301,17 +331,20 @@ exports.getAllAttendanceByDate = async (req, res) => {
       };
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
       attendance: processedAttendance,
-      message: processedAttendance.length > 0 ? "Attendance records found" : "No attendance records found for this date"
+      message:
+        processedAttendance.length > 0
+          ? "Attendance records found"
+          : "No attendance records found for this date",
     });
   } catch (error) {
     console.error("Get all attendance by date error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Failed to get attendance records", 
-      error: error.message 
+      message: "Failed to get attendance records",
+      error: error.message,
     });
   }
 };
@@ -327,34 +360,38 @@ exports.getEmployeeAttendanceHistory = async (req, res) => {
       const start = getStartOfDayISTAsUTC(new Date(startDate));
       const end = getStartOfDayISTAsUTC(new Date(endDate));
       dateQuery = {
-        date: { $gte: start, $lte: end }
+        date: { $gte: start, $lte: end },
       };
     } else {
       // Default to last 90 days
       const today = getStartOfDayISTAsUTC();
       const threeMonthsAgo = new Date(today);
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 12);
       dateQuery = {
-        date: { $gte: threeMonthsAgo, $lte: today }
+        date: { $gte: threeMonthsAgo, $lte: today },
       };
     }
 
-    if (role !== 'Super Admin' && role !== 'Admin') {
+    if (role !== "Super Admin" && role !== "Admin") {
       // Add role-based filtering if needed
     }
 
     const attendance = await Attendance.find({
       employeeId: employeeId,
-      ...dateQuery
+      ...dateQuery,
     })
-    .populate('employeeId', 'name department employeeId')
-    .sort({ date: -1 });
+      .populate("employeeId", "name department employeeId")
+      .sort({ date: -1 });
 
     // Ensure all records have calculated totals
-    const processedAttendance = attendance.map(record => {
-      const totalWorkedHours = record.totalWorkedHours ?? record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
-      const totalBreakHours = record.totalBreakHours ?? record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
-      
+    const processedAttendance = attendance.map((record) => {
+      const totalWorkedHours =
+        record.totalWorkedHours ??
+        record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
+      const totalBreakHours =
+        record.totalBreakHours ??
+        record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
+
       return {
         ...record.toObject(),
         totalWorkedHours,
@@ -365,14 +402,17 @@ exports.getEmployeeAttendanceHistory = async (req, res) => {
     res.status(200).json({
       success: true,
       attendance: processedAttendance,
-      message: processedAttendance.length > 0 ? "Attendance history found" : "No attendance history found"
+      message:
+        processedAttendance.length > 0
+          ? "Attendance history found"
+          : "No attendance history found",
     });
   } catch (error) {
     console.error("Get employee attendance history error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get attendance history",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -383,27 +423,33 @@ exports.getAttendanceSummary = async (req, res) => {
     const { date, _id, role } = req.body;
     const queryDate = getStartOfDayISTAsUTC(new Date(date));
 
-    const attendance = await Attendance.find({ date: queryDate })
-      .populate('employeeId', 'name department employeeId status');
+    const attendance = await Attendance.find({ date: queryDate }).populate(
+      "employeeId",
+      "name department employeeId status",
+    );
 
-    const totalEmployees = await Employee.countDocuments({ status: 'Active' });
+    const totalEmployees = await Employee.countDocuments({ status: "Active" });
     const presentEmployees = attendance.length;
     const absentEmployees = totalEmployees - presentEmployees;
-    
+
     let activeEmployees = 0;
     let onBreakEmployees = 0;
     let totalWorkedHours = 0;
     let totalBreakHours = 0;
 
-    attendance.forEach(record => {
+    attendance.forEach((record) => {
       totalWorkedHours += record.totalWorkedHours || 0;
       totalBreakHours += record.totalBreakHours || 0;
 
-      const hasActiveSession = record.sessions.some(session => !session.checkOut);
+      const hasActiveSession = record.sessions.some(
+        (session) => !session.checkOut,
+      );
       if (hasActiveSession) activeEmployees++;
 
-      const hasActiveBreak = record.sessions.some(session =>
-        session.breaks && session.breaks.some(breakItem => !breakItem.breakEnd)
+      const hasActiveBreak = record.sessions.some(
+        (session) =>
+          session.breaks &&
+          session.breaks.some((breakItem) => !breakItem.breakEnd),
       );
       if (hasActiveBreak) onBreakEmployees++;
     });
@@ -416,20 +462,23 @@ exports.getAttendanceSummary = async (req, res) => {
       onBreakEmployees,
       totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
       totalBreakHours: Math.round(totalBreakHours * 100) / 100,
-      averageWorkedHours: presentEmployees > 0 ? Math.round((totalWorkedHours / presentEmployees) * 100) / 100 : 0
+      averageWorkedHours:
+        presentEmployees > 0
+          ? Math.round((totalWorkedHours / presentEmployees) * 100) / 100
+          : 0,
     };
 
     res.status(200).json({
       success: true,
       summary,
-      message: "Attendance summary calculated successfully"
+      message: "Attendance summary calculated successfully",
     });
   } catch (error) {
     console.error("Get attendance summary error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get attendance summary",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -444,48 +493,50 @@ exports.searchEmployeesWithAttendance = async (req, res) => {
     if (searchTerm) {
       employeeQuery = {
         $or: [
-          { name: { $regex: searchTerm, $options: 'i' } },
-          { department: { $regex: searchTerm, $options: 'i' } },
-          { employeeId: { $regex: searchTerm, $options: 'i' } },
-          { email: { $regex: searchTerm, $options: 'i' } }
-        ]
+          { name: { $regex: searchTerm, $options: "i" } },
+          { department: { $regex: searchTerm, $options: "i" } },
+          { employeeId: { $regex: searchTerm, $options: "i" } },
+          { email: { $regex: searchTerm, $options: "i" } },
+        ],
       };
     }
 
-    if (role !== 'Super Admin' && role !== 'Admin') {
+    if (role !== "Super Admin" && role !== "Admin") {
       // Add role-based filtering here if needed
     }
 
-    const employees = await Employee.find(employeeQuery).select('name department employeeId email status');
-    const employeeIds = employees.map(emp => emp._id);
+    const employees = await Employee.find(employeeQuery).select(
+      "name department employeeId email status",
+    );
+    const employeeIds = employees.map((emp) => emp._id);
     const attendance = await Attendance.find({
       employeeId: { $in: employeeIds },
-      date: queryDate
-    }).populate('employeeId', 'name department employeeId');
+      date: queryDate,
+    }).populate("employeeId", "name department employeeId");
 
-    const employeesWithAttendance = employees.map(employee => {
-      const attendanceRecord = attendance.find(att => 
-        att.employeeId._id.toString() === employee._id.toString()
+    const employeesWithAttendance = employees.map((employee) => {
+      const attendanceRecord = attendance.find(
+        (att) => att.employeeId._id.toString() === employee._id.toString(),
       );
-      
+
       return {
         ...employee.toObject(),
         attendance: attendanceRecord || null,
-        status: attendanceRecord ? 'Present' : 'Absent'
+        status: attendanceRecord ? "Present" : "Absent",
       };
     });
 
     res.status(200).json({
       success: true,
       employees: employeesWithAttendance,
-      message: `Found ${employeesWithAttendance.length} employees`
+      message: `Found ${employeesWithAttendance.length} employees`,
     });
   } catch (error) {
     console.error("Search employees with attendance error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to search employees",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -493,90 +544,121 @@ exports.searchEmployeesWithAttendance = async (req, res) => {
 // 📋 Get attendance report for date range
 exports.getAttendanceReport = async (req, res) => {
   try {
-    const { startDate, endDate, employeeId, department, _id, role } = req.body;
+    const { month, year, employeeId, department, _id, role } = req.body;
 
-    let dateQuery = {};
-    if (startDate && endDate) {
-      const start = getStartOfDayISTAsUTC(new Date(startDate));
-      const end = getStartOfDayISTAsUTC(new Date(endDate));
-      dateQuery = {
-        date: { $gte: start, $lte: end }
-      };
-    } else {
-      // Default to current month
-      const now = getStartOfDayISTAsUTC();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      dateQuery = {
-        date: { $gte: startOfMonth, $lte: endOfMonth }
-      };
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "month and year are required",
+      });
     }
 
-    let attendanceQuery = { ...dateQuery };
+    const numericMonth = Number(month); // 1 to 12
+    const numericYear = Number(year);
+
+    if (
+      Number.isNaN(numericMonth) ||
+      Number.isNaN(numericYear) ||
+      numericMonth < 1 ||
+      numericMonth > 12
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid month or year",
+      });
+    }
+
+    // Build month range in UTC because your DB stores date like 2026-03-27T00:00:00.000Z
+    const startDate = new Date(Date.UTC(numericYear, numericMonth - 1, 1));
+    const endDate = new Date(Date.UTC(numericYear, numericMonth, 1));
+
+    let attendanceQuery = {
+      date: {
+        $gte: startDate,
+        $lt: endDate,
+      },
+    };
+
     if (employeeId) {
       attendanceQuery.employeeId = employeeId;
     }
 
     let attendance = await Attendance.find(attendanceQuery)
-      .populate('employeeId', 'name department employeeId email')
-      .sort({ date: -1, 'employeeId.name': 1 });
+      .populate("employeeId", "name department employeeId email")
+      .sort({ date: -1 });
 
     if (department) {
-      attendance = attendance.filter(record => 
-        record.employeeId.department === department
+      attendance = attendance.filter(
+        (record) => record.employeeId?.department === department,
       );
     }
 
-    if (role !== 'Super Admin' && role !== 'Admin') {
-      // Add role-based filtering logic here
+    if (role !== "Super Admin" && role !== "Admin") {
+      // add role-based filtering here if needed
     }
 
-    const totalRecords = attendance.length;
-    const totalWorkedHours = attendance.reduce((sum, record) => sum + (record.totalWorkedHours || 0), 0);
-    const totalBreakHours = attendance.reduce((sum, record) => sum + (record.totalBreakHours || 0), 0);
-    const averageWorkedHours = totalRecords > 0 ? totalWorkedHours / totalRecords : 0;
+    // Group employee-wise monthly summary
+    const employeeMap = {};
 
-    // Group by employee for summary
-    const employeeSummary = {};
-    attendance.forEach(record => {
-      const empId = record.employeeId._id.toString();
-      if (!employeeSummary[empId]) {
-        employeeSummary[empId] = {
-          employee: record.employeeId,
-          totalDays: 0,
-          totalWorkedHours: 0,
+    attendance.forEach((record) => {
+      const emp = record.employeeId;
+      if (!emp) return;
+
+      const empId = emp._id.toString();
+
+      if (!employeeMap[empId]) {
+        employeeMap[empId] = {
+          employeeId: empId,
+          employeeName: emp.name || "Unknown",
+          employeeCode: emp.employeeId || "N/A",
+          totalWorkingDays: 0,
+          totalHoursWorked: 0,
           totalBreakHours: 0,
-          averageWorkedHours: 0
+          averageHoursPerDay: 0,
         };
       }
-      employeeSummary[empId].totalDays++;
-      employeeSummary[empId].totalWorkedHours += record.totalWorkedHours || 0;
-      employeeSummary[empId].totalBreakHours += record.totalBreakHours || 0;
+
+      const workedHours =
+        record.totalWorkedHours ??
+        record.sessions.reduce((sum, s) => sum + (s.workedHours || 0), 0);
+
+      const breakHours =
+        record.totalBreakHours ??
+        record.sessions.reduce((sum, s) => sum + (s.totalBreakHours || 0), 0);
+
+      employeeMap[empId].totalWorkingDays += 1;
+      employeeMap[empId].totalHoursWorked += workedHours;
+      employeeMap[empId].totalBreakHours += breakHours;
     });
 
-    Object.keys(employeeSummary).forEach(empId => {
-      const summary = employeeSummary[empId];
-      summary.averageWorkedHours = summary.totalDays > 0 ? summary.totalWorkedHours / summary.totalDays : 0;
-    });
+    const report = Object.values(employeeMap).map((emp) => ({
+      ...emp,
+      totalHoursWorked: Number(emp.totalHoursWorked.toFixed(2)),
+      totalBreakHours: Number(emp.totalBreakHours.toFixed(2)),
+      averageHoursPerDay:
+        emp.totalWorkingDays > 0
+          ? Number((emp.totalHoursWorked / emp.totalWorkingDays).toFixed(2))
+          : 0,
+    }));
 
-    res.status(200).json({
+    report.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
+    return res.status(200).json({
       success: true,
-      attendance,
-      summary: {
-        totalRecords,
-        totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
-        totalBreakHours: Math.round(totalBreakHours * 100) / 100,
-        averageWorkedHours: Math.round(averageWorkedHours * 100) / 100
-      },
-      employeeSummary: Object.values(employeeSummary),
-      message: `Found ${totalRecords} attendance records`
+      report,
+      selectedMonth: numericMonth,
+      selectedYear: numericYear,
+      message:
+        report.length > 0
+          ? "Attendance report fetched successfully"
+          : "No attendance data found for selected month and year",
     });
   } catch (error) {
     console.error("Get attendance report error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to get attendance report",
-      error: error.message
+      error: error.message,
     });
   }
 };

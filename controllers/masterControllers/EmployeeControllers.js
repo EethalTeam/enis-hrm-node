@@ -1,18 +1,68 @@
-const Employee = require('../../models/masterModels/Employee');
-const Department = require('../../models/masterModels/Department')
-const Designation = require('../../models/masterModels/Designation')
-const Shift = require('../../models/masterModels/Shift')
-const WorkLocation = require('../../models/masterModels/WorkLocation')
-const Role = require('../../models/masterModels/Role')
-const Status = require('../../models/masterModels/Status')
-const bcrypt = require('bcrypt');
-const mongoose = require('mongoose');
-const defaultMenus = require('./defaultMenu.json')
-const UserRights = require('../../models/masterModels/UserRights')
-const MenuRegistry = require('../../models/masterModels/MenuRegistry')
-const RoleBased = require("../../models/masterModels/RBAC")
+const Employee = require("../../models/masterModels/Employee");
+const Department = require("../../models/masterModels/Department");
+const Designation = require("../../models/masterModels/Designation");
+const Shift = require("../../models/masterModels/Shift");
+const WorkLocation = require("../../models/masterModels/WorkLocation");
+const Role = require("../../models/masterModels/Role");
+const Status = require("../../models/masterModels/Status");
+const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
+const defaultMenus = require("./defaultMenu.json");
+const UserRights = require("../../models/masterModels/UserRights");
+const MenuRegistry = require("../../models/masterModels/MenuRegistry");
+const RoleBased = require("../../models/masterModels/RBAC");
 const LeaveBalance = require("../../models/masterModels/LeaveBalance");
-const {autoCheckoutOnDisconnect} = require("../masterControllers/AttendanceControllers")
+const Client = require("../../models/masterModels/Client");
+const {
+  autoCheckoutOnDisconnect,
+} = require("../masterControllers/AttendanceControllers");
+// const LeaveModel = require("../../model/masterModels/Leave");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// --- MULTER CONFIGURATION ---
+const uploadDir = "Employeepic";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    cb(null, `employee-${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png/;
+  const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mime = allowedTypes.test(file.mimetype);
+  if (ext && mime) return cb(null, true);
+  cb(new Error("Only .png, .jpg and .jpeg formats are allowed!"));
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("avatar");
+// --- MIDDLEWARE WRAPPER ---
+exports.employeeUploadMiddleware = (req, res, next) => {
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({
+        message:
+          err.code === "LIMIT_FILE_SIZE"
+            ? "File too large (Max 5MB)"
+            : err.message,
+      });
+    } else if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    next();
+  });
+};
 
 // CREATE Employee + LeaveBalance
 exports.createEmployee = async (req, res) => {
@@ -32,15 +82,17 @@ exports.createEmployee = async (req, res) => {
       phoneNumber,
       salary,
       statusId,
-      avatar,
       workingHours,
       workLocationId,
       roleId,
       shiftId,
-      unitId // required for LeaveBalance
+      unitId,
     } = req.body;
 
-    // ✅ Step 1: Create Employee
+    const avatar = req.file
+      ? `${req.protocol}://${req.get("host")}/Employeepic/${req.file.filename}`
+      : "";
+
     const employee = new Employee({
       code,
       name,
@@ -57,23 +109,33 @@ exports.createEmployee = async (req, res) => {
       workingHours,
       workLocationId,
       roleId,
-      shiftId
+      shiftId,
     });
 
     await employee.save({ session });
 
-    // ✅ Step 2: Assign default leave balances using provided IDs
     const leaveBalances = [
-      { leaveTypeId: "68b6a07021723b01602c4170", totalAllocated: 12, remaining: 12 }, // Annual Leave
-      { leaveTypeId: "68b6a00021723b01602c416b", totalAllocated: 10, remaining: 10 }, // Sick Leave
-      { leaveTypeId: "68b69fee21723b01602c4167", totalAllocated: 12, remaining: 12 }  // Casual Leave
+      {
+        leaveTypeId: "6925467ba48e61da37c0a220",
+        totalAllocated: 12,
+        remaining: 12,
+      },
+      {
+        leaveTypeId: "69254608a48e61da37c0a1f5",
+        totalAllocated: 10,
+        remaining: 10,
+      },
+      {
+        leaveTypeId: "692545eda48e61da37c0a1e8",
+        totalAllocated: 12,
+        remaining: 12,
+      },
     ];
 
-    // ✅ Step 3: Save LeaveBalance
     const newLeaveBalance = new LeaveBalance({
       employeeId: employee._id,
       unitId,
-      leaveBalances
+      leaveBalances,
     });
 
     await newLeaveBalance.save({ session });
@@ -84,7 +146,7 @@ exports.createEmployee = async (req, res) => {
     res.status(201).json({
       message: "Employee created successfully with leave balances",
       employee,
-      leaveBalance: newLeaveBalance
+      leaveBalance: newLeaveBalance,
     });
   } catch (error) {
     await session.abortTransaction();
@@ -92,7 +154,7 @@ exports.createEmployee = async (req, res) => {
     console.error("Error creating employee with leave balance:", error);
     res.status(500).json({
       message: "Failed to create employee with leave balance",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -100,121 +162,160 @@ exports.createEmployee = async (req, res) => {
 // GET ALL Employees
 exports.getAllEmployees = async (req, res) => {
   try {
-    const employees = await Employee.aggregate([
-      // Department
-      {
-        $lookup: {
-          from: "departments",
-          localField: "departmentId",
-          foreignField: "_id",
-          as: "department"
-        }
-      },
-      { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+    const employees = await Employee.find({})
+      .populate("departmentId", "departmentName")
+      .populate("designationId", "designationName")
+      .populate("roleId", "RoleName")
+      .populate("statusId", "statusName")
+      .populate("workLocationId", "locationName")
+      .populate("shiftId", "shiftName startTime endTime")
+      .lean();
 
-      // Designation
-      {
-        $lookup: {
-          from: "designations",
-          localField: "designationId",
-          foreignField: "_id",
-          as: "designation"
-        }
-      },
-      { $unwind: { path: "$designation", preserveNullAndEmptyArrays: true } },
+    const formattedEmployees = employees.map((emp) => ({
+      _id: emp._id,
+      code: emp.code,
+      name: emp.name,
+      email: emp.email,
+      password: emp.password,
+      joinDate: emp.joinDate,
+      birthDate: emp.birthDate,
+      phoneNumber: emp.phoneNumber,
+      salary: emp.salary,
+      avatar: emp.avatar,
+      workingHours: emp.workingHours,
+      lastLoggedIn: emp.lastLoggedIn,
+      isCurrentlyLoggedIn: emp.isCurrentlyLoggedIn,
+      isActive: emp.isActive,
 
-      // Role
-      {
-        $lookup: {
-          from: "roles",
-          localField: "roleId",
-          foreignField: "_id",
-          as: "role"
-        }
-      },
-      { $unwind: { path: "$role", preserveNullAndEmptyArrays: true } },
+      departmentId: emp.departmentId?._id || null,
+      departmentName: emp.departmentId?.departmentName || "",
 
-      // Status
-      {
-        $lookup: {
-          from: "status",
-          localField: "statusId",
-          foreignField: "_id",
-          as: "status"
-        }
-      },
-      { $unwind: { path: "$status", preserveNullAndEmptyArrays: true } },
+      designationId: emp.designationId?._id || null,
+      designationName: emp.designationId?.designationName || "",
 
-      // Work Location
-      {
-        $lookup: {
-          from: "worklocations",
-          localField: "workLocationId",
-          foreignField: "_id",
-          as: "workLocation"
-        }
-      },
-      { $unwind: { path: "$workLocation", preserveNullAndEmptyArrays: true } },
+      roleId: emp.roleId?._id || null,
+      roleName: emp.roleId?.RoleName || "",
 
-      // Shift
-      {
-        $lookup: {
-          from: "shifts",
-          localField: "shiftId",
-          foreignField: "_id",
-          as: "shift"
-        }
-      },
-      { $unwind: { path: "$shift", preserveNullAndEmptyArrays: true } },
+      statusId: emp.statusId?._id || null,
+      statusName: emp.statusId?.statusName || "",
 
-      // Final projection (include IDs + names)
-      {
-        $project: {
-          _id: 1,
-          code:1,
-          name: 1,
-          email: 1,
-          password:1,
-          joinDate: 1,
-          birthDate:1,
-          phoneNumber:1,
-          salary: 1,
-          avatar: 1,
-          workingHours: 1,
-          lastLoggedIn: 1,
-          isCurrentlyLoggedIn: 1,
-          isActive: 1,
+      workLocationId: emp.workLocationId?._id || null,
+      workLocationName: emp.workLocationId?.locationName || "",
 
-          departmentId: 1,
-          departmentName: "$department.departmentName",
+      shiftId: emp.shiftId?._id || null,
+      shiftName: emp.shiftId?.shiftName || "",
+      shiftStartTime: emp.shiftId?.startTime || "",
+      shiftEndTime: emp.shiftId?.endTime || "",
+    }));
 
-          designationId: 1,
-          designationName: "$designation.designationName",
+    res.status(200).json(formattedEmployees);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+exports.getAllActiveEmployees = async (req, res) => {
+  try {
+    const employees = await Employee.find({ isActive: true })
+      .populate("departmentId", "departmentName")
+      .populate("designationId", "designationName")
+      .populate("roleId", "RoleName")
+      .populate("statusId", "statusName")
+      .populate("workLocationId", "locationName")
+      .populate("shiftId", "shiftName startTime endTime")
+      .lean();
 
-          roleId: 1,
-          roleName: "$role.RoleName",
+    const formattedEmployees = employees.map((emp) => ({
+      _id: emp._id,
+      code: emp.code,
+      name: emp.name,
+      email: emp.email,
+      password: emp.password,
+      joinDate: emp.joinDate,
+      birthDate: emp.birthDate,
+      phoneNumber: emp.phoneNumber,
+      salary: emp.salary,
+      avatar: emp.avatar,
+      workingHours: emp.workingHours,
+      lastLoggedIn: emp.lastLoggedIn,
+      isCurrentlyLoggedIn: emp.isCurrentlyLoggedIn,
+      isActive: emp.isActive,
 
-          statusId: 1,
-          statusName: "$status.statusName",
+      departmentId: emp.departmentId?._id || null,
+      departmentName: emp.departmentId?.departmentName || "",
 
-          workLocationId: 1,
-          workLocationName: "$workLocation.locationName",
+      designationId: emp.designationId?._id || null,
+      designationName: emp.designationId?.designationName || "",
 
-          shiftId: 1,
-          shiftName: "$shift.shiftName",
-          shiftStartTime:"$shift.startTime",
-          shiftEndTime:"$shift.endTime"
-        }
-      }
-    ]);
+      roleId: emp.roleId?._id || null,
+      roleName: emp.roleId?.RoleName || "",
 
-    res.status(200).json(employees);
+      statusId: emp.statusId?._id || null,
+      statusName: emp.statusId?.statusName || "",
+
+      workLocationId: emp.workLocationId?._id || null,
+      workLocationName: emp.workLocationId?.locationName || "",
+
+      shiftId: emp.shiftId?._id || null,
+      shiftName: emp.shiftId?.shiftName || "",
+      shiftStartTime: emp.shiftId?.startTime || "",
+      shiftEndTime: emp.shiftId?.endTime || "",
+    }));
+
+    res.status(200).json(formattedEmployees);
   } catch (error) {
     console.error("Error fetching employees:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
+exports.uploadEmployeeAvatar = async (req, res) => {
+  try {
+    const { _id } = req.body;
+
+    if (!_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee id is required",
+      });
+    }
+
+    const employee = await Employee.findById(_id);
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image uploaded",
+      });
+    }
+
+    const avatarUrl = `${req.protocol}://${req.get("host")}/Employeepic/${req.file.filename}`;
+
+    employee.avatar = avatarUrl;
+    await employee.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Avatar uploaded successfully",
+      employee,
+      avatar: avatarUrl,
+    });
+  } catch (error) {
+    console.error("uploadEmployeeAvatar error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload avatar",
+      error: error.message,
+    });
+  }
+};
 // GET ALL Department
 exports.getAllDepartments = async (req, res) => {
   try {
@@ -222,7 +323,9 @@ exports.getAllDepartments = async (req, res) => {
     res.status(200).json(department);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
@@ -233,7 +336,9 @@ exports.getAllDesignations = async (req, res) => {
     res.status(200).json(designation);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
@@ -244,7 +349,9 @@ exports.getAllShifts = async (req, res) => {
     res.status(200).json(shift);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
@@ -255,18 +362,22 @@ exports.getAllWorkLocations = async (req, res) => {
     res.status(200).json(workLocation);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
 // GET ALL Role
 exports.getAllRoles = async (req, res) => {
   try {
-    const role = await Role.find();
+    const role = await RoleBased.find();
     res.status(200).json(role);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
@@ -277,7 +388,9 @@ exports.getAllStatus = async (req, res) => {
     res.status(200).json(status);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employees", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employees", error: error.message });
   }
 };
 
@@ -293,30 +406,73 @@ exports.getEmployeeById = async (req, res) => {
     res.status(200).json(employee);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to get employee", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get employee", error: error.message });
   }
 };
 
 // UPDATE Employee
 exports.updateEmployee = async (req, res) => {
   try {
-    const employee = await Employee.findByIdAndUpdate(
-      req.body._id,
-      req.body, // directly from req.body
-      { new: true, runValidators: true }
-    );
+    if (!req.body || !req.body._id) {
+      return res.status(400).json({ message: "_id is required" });
+    }
 
-    if (!employee) {
+    const existingEmployee = await Employee.findById(req.body._id);
+
+    if (!existingEmployee) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    res.status(200).json({ message: "Employee updated successfully", employee });
+    let avatar = existingEmployee.avatar;
+
+    if (req.file) {
+      avatar = `${req.protocol}://${req.get("host")}/Employeepic/${req.file.filename}`;
+    }
+    const statusIdInactive = "69253cc8a48e61da37c09edc";
+
+    let isActive = true;
+
+    if (req.body.statusId === statusIdInactive) {
+      isActive = false;
+    }
+    const employee = await Employee.findByIdAndUpdate(
+      req.body._id,
+      {
+        code: req.body.code,
+        name: req.body.name,
+        email: req.body.email,
+        password: req.body.password,
+        designationId: req.body.designationId,
+        departmentId: req.body.departmentId,
+        joinDate: req.body.joinDate,
+        birthDate: req.body.birthDate,
+        phoneNumber: req.body.phoneNumber,
+        salary: req.body.salary,
+        statusId: req.body.statusId,
+        shiftId: req.body.shiftId,
+        workingHours: req.body.workingHours,
+        workLocationId: req.body.workLocationId,
+        roleId: req.body.roleId,
+        avatar,
+        isActive: isActive,
+      },
+      { new: true, runValidators: true },
+    );
+
+    res.status(200).json({
+      message: "Employee updated successfully",
+      employee,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to update employee", error: error.message });
+    res.status(500).json({
+      message: "Failed to update employee",
+      error: error.message,
+    });
   }
 };
-
 // DELETE Employee
 exports.deleteEmployee = async (req, res) => {
   try {
@@ -329,7 +485,9 @@ exports.deleteEmployee = async (req, res) => {
     res.status(200).json({ message: "Employee deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to delete employee", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete employee", error: error.message });
   }
 };
 
@@ -338,46 +496,45 @@ exports.loginEmployee = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Reject if request is from mobile device
     const userAgent = req.headers["user-agent"] || "";
-    const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
-    if (isMobile) {
-      return res.status(403).json({ message: "Login from mobile devices is not allowed" });
+    const isMobileUA = /mobile|android|iphone|ipad|phone/i.test(userAgent);
+    const isMobileHardware = req.headers["x-is-mobile-hardware"] === "true";
+
+    if (isMobileUA || isMobileHardware) {
+      return res.status(403).json({
+        message:
+          "Login from mobile devices (including Desktop Mode) is not allowed.",
+      });
     }
 
-    // 2. Find employee by email
-    const employee = await Employee.findOne({ email: email }).populate("roleId", "RoleName");
+    const employee = await Employee.findOne({ email: email }).populate(
+      "roleId",
+      "RoleName",
+    );
+
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // 3. Check if employee is already logged in
-    // if (employee.isCurrentlyLoggedIn) {
-    //   return res.status(403).json({ message: "Employee is already logged in" });
-    // }
-
-    // 4. Compare plain password (since not hashing yet)
     if (employee.password !== password) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // 5. Mark employee as logged in
     employee.isCurrentlyLoggedIn = true;
     await employee.save();
 
-    // 6. Success
     res.status(200).json({
       message: "Login successful",
       employee: {
         _id: employee._id,
-        employeeCode:employee.code?employee.code :'',
+        employeeCode: employee.code ? employee.code : "",
         name: employee.name,
         email: employee.email,
-        role:employee.roleId.RoleName,
-        isCurrentlyLoggedIn: employee.isCurrentlyLoggedIn
+        role: employee.roleId?.RoleName || "",
+        avatar: employee.avatar || "",
+        isCurrentlyLoggedIn: employee.isCurrentlyLoggedIn,
       },
     });
-
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Login failed", error: error.message });
@@ -386,17 +543,25 @@ exports.loginEmployee = async (req, res) => {
 
 exports.logoutEmployee = async (req, res) => {
   try {
-    const { email } = req.body; // or get from token/session if you’re using auth
+    const { email, UserName } = req.body; // or get from token/session if you’re using auth
 
     // 1. Find employee
     const employee = await Employee.findOne({ email: email });
     if (!employee) {
+      const client = await Client.findOne({ UserName: UserName });
+      if (client) {
+        client.isCurrentlyLoggedIn = false;
+        await client.save();
+        return res.status(200).json({ message: "Client logout successful" });
+      }
       return res.status(404).json({ message: "Employee not found" });
     }
 
     // 2. Check if already logged out
     if (!employee.isCurrentlyLoggedIn) {
-      return res.status(400).json({ message: "Employee is already logged out" });
+      return res
+        .status(400)
+        .json({ message: "Employee is already logged out" });
     }
 
     // 3. Update login status
@@ -413,8 +578,9 @@ exports.logoutEmployee = async (req, res) => {
 exports.logoutUser = async (employeeId) => {
   try {
     // Update lastActive or any other logout tracking if needed
-    await Employee.findByIdAndUpdate(employeeId, { isCurrentlyLoggedIn: false });
-
+    await Employee.findByIdAndUpdate(employeeId, {
+      isCurrentlyLoggedIn: false,
+    });
   } catch (err) {
     console.error("❌ Error logging out user:", err.message);
   }
@@ -423,7 +589,9 @@ exports.logoutUser = async (employeeId) => {
 exports.cronJobLogOut = async (req, res) => {
   try {
     // Get all employees currently logged in
-    const loggedInEmployees = await Employee.find({ isCurrentlyLoggedIn: true });
+    const loggedInEmployees = await Employee.find({
+      isCurrentlyLoggedIn: true,
+    });
 
     if (loggedInEmployees.length === 0) {
       console.log("✅ No logged-in employees found at logout time.");
@@ -439,7 +607,9 @@ exports.cronJobLogOut = async (req, res) => {
       await employee.save();
     }
 
-    console.log(`🕖 Cron job logout executed: ${loggedInEmployees.length} employees logged out.`);
+    console.log(
+      `🕖 Cron job logout executed: ${loggedInEmployees.length} employees logged out.`,
+    );
 
     return res.status(200).json({
       message: `${loggedInEmployees.length} employees logged out and auto-checked out successfully.`,
@@ -474,4 +644,3 @@ exports.checkLogin = async (req, res, next) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-

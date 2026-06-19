@@ -1,81 +1,93 @@
 const mongoose = require("mongoose");
 
-const TaskSchema = new mongoose.Schema(
+const SubTaskSchema = new mongoose.Schema(
   {
-    taskCode: {
+    parentTaskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+    },
+    subtaskCode: {
       type: String,
       trim: true,
     },
-    taskName: {
+    subtaskName: {
       type: String,
       required: true,
       trim: true,
     },
-    projectId: {
+    subTaskType: {
+      type: String,
+      enum: ["Dependent", "Independent"],
+    },
+    dependencyTaskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubTask",
+    },
+    subprojectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
     },
-    notifyId: [
+    subnotifyId: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Employee",
         default: null,
       },
     ],
-    description: {
+    subdescription: {
       type: String,
       trim: true,
     },
-    startDate: {
+    substartDate: {
       type: Date,
     },
-    dueDate: {
+    subdueDate: {
       type: Date,
     },
-    taskStatusId: {
+    subtaskStatusId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TaskStatus",
     },
-    taskPriorityId: {
+    subtaskPriorityId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TaskPriority",
     },
-    assignedTo: [
+    subassignedTo: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Employee",
       },
     ],
-    createdBy: {
+    subcreatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
     },
-    feedback: {
+    subfeedback: {
       type: String,
       trim: true,
     },
-    reqLeadCount: {
+    subreqLeadCount: {
       type: String,
       trim: true,
     },
-    compLeadCount: {
+    subcompLeadCount: {
       type: String,
       trim: true,
     },
-    progressDetails: [
+    subprogressDetails: [
       {
         type: String,
         trim: true,
       },
     ],
-    reasonForPending: [
+    subreasonForPending: [
       {
         type: String,
         trim: true,
       },
     ],
-    workLogs: [
+    subworkLogs: [
       {
         employeeId: {
           type: mongoose.Schema.Types.ObjectId,
@@ -102,4 +114,4 @@ const TaskSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("Task", TaskSchema);
+module.exports = mongoose.model("SubTask", SubTaskSchema);

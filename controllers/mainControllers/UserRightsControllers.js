@@ -1,7 +1,7 @@
 // controllers/userRightsController.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const MenuRegistry = require("../../models/masterModels/MenuRegistry");
-const UserRights = require('../../models/masterModels/UserRights');
+const UserRights = require("../../models/masterModels/UserRights");
 const Employee = require("../../models/masterModels/Employee");
 
 exports.createUserRights = async (req, res) => {
@@ -10,25 +10,25 @@ exports.createUserRights = async (req, res) => {
 
     if (!employeeId || !rights || !Array.isArray(rights)) {
       return res.status(400).json({
-        message: "employeeId and rights array are required."
+        message: "employeeId and rights array are required.",
       });
     }
 
     // Prepare documents
-    const docs = rights.map(item => ({
-      employeeId:new mongoose.Types.ObjectId(employeeId),
-      menuId:new mongoose.Types.ObjectId(item.menuId),
+    const docs = rights.map((item) => ({
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+      menuId: new mongoose.Types.ObjectId(item.menuId),
       isEnable: item.isEnable ?? true,
       isView: item.isView ?? true,
       isEdit: item.isEdit ?? true,
       isAdd: item.isAdd ?? true,
-      isDelete: item.isDelete ?? true
+      isDelete: item.isDelete ?? true,
     }));
 
     await UserRights.insertMany(docs);
 
     res.status(200).json({
-      message: "User rights created successfully."
+      message: "User rights created successfully.",
     });
   } catch (error) {
     console.error("Create UserRights error:", error);
@@ -39,11 +39,11 @@ function buildMenuTree(flatList) {
   const map = new Map();
   const roots = [];
 
-  flatList.forEach(item => {
+  flatList.forEach((item) => {
     map.set(item.formId, { ...item, children: [] });
   });
 
-  flatList.forEach(item => {
+  flatList.forEach((item) => {
     if (item.parentFormId) {
       const parent = map.get(item.parentFormId);
       if (parent) {
@@ -62,7 +62,7 @@ exports.getUserRightsByEmployee = async (req, res) => {
 
     if (!employeeId) {
       return res.status(400).json({
-        message: "employeeId is required"
+        message: "employeeId is required",
       });
     }
 
@@ -70,24 +70,24 @@ exports.getUserRightsByEmployee = async (req, res) => {
 
     // Fetch UserRights document
     const userRights = await UserRights.findOne({
-      employeeId: employeeObjectId
+      employeeId: employeeObjectId,
     }).lean();
 
     if (!userRights || !userRights.menus || userRights.menus.length === 0) {
       return res.status(200).json({
         message: "No user rights found.",
-        data: []
+        data: [],
       });
     }
 
     // Step 1: Get all unique menuIds
-    const allMenuIds = userRights.menus.map((m) =>
-      new mongoose.Types.ObjectId(m.menuId)
+    const allMenuIds = userRights.menus.map(
+      (m) => new mongoose.Types.ObjectId(m.menuId),
     );
 
     // Step 2: Lookup sortOrder and other details from MenuRegistry
     const menuRegistryDocs = await MenuRegistry.find({
-      _id: { $in: allMenuIds }
+      _id: { $in: allMenuIds },
     })
       .select("_id formId title parentFormId sortOrder")
       .lean();
@@ -98,7 +98,7 @@ exports.getUserRightsByEmployee = async (req, res) => {
     });
 
     // Step 4: Assemble the menus with sortOrder etc.
-    const enabledMenus = userRights.menus.filter(m => m.isEnable === true);
+    const enabledMenus = userRights.menus.filter((m) => m.isEnable === true);
 
     const result = enabledMenus.map((menu) => {
       const registry = menuRegistryMap.get(menu.menuId?.toString()) || {};
@@ -113,7 +113,7 @@ exports.getUserRightsByEmployee = async (req, res) => {
         isEdit: menu.isEdit,
         isDelete: menu.isDelete,
         isNotification: menu.isNotification,
-        sortOrder: registry.sortOrder || 0
+        sortOrder: registry.sortOrder || 0,
       };
     });
 
@@ -125,12 +125,12 @@ exports.getUserRightsByEmployee = async (req, res) => {
 
     return res.status(200).json({
       message: "User rights fetched successfully.",
-      data: menuTree
+      data: menuTree,
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -142,7 +142,10 @@ exports.getAllUserRights = async (req, res) => {
       .lean();
 
     // 🔑 Get all menus once
-    const allMenus = await MenuRegistry.find({}, "_id formId parentFormId title").lean();
+    const allMenus = await MenuRegistry.find(
+      {},
+      "_id formId parentFormId title",
+    ).lean();
 
     const results = [];
     for (const userRight of allUserRights) {
@@ -150,10 +153,10 @@ exports.getAllUserRights = async (req, res) => {
 
       // 1. Map existing rights into a dictionary for fast lookup
       const rightsMap = new Map(
-        userRight.menus.map(m => [String(m.formId), m])
+        userRight.menus.map((m) => [String(m.formId), m]),
       );
       // 2. Merge all menus with rights
-      const mergedMenus = allMenus.map(menu => {
+      const mergedMenus = allMenus.map((menu) => {
         const rights = rightsMap.get(String(menu.formId));
         return {
           menuId: menu._id,
@@ -164,7 +167,7 @@ exports.getAllUserRights = async (req, res) => {
           isView: rights ? rights.isView : false,
           isAdd: rights ? rights.isAdd : false,
           isEdit: rights ? rights.isEdit : false,
-          isDelete: rights ? rights.isDelete : false
+          isDelete: rights ? rights.isDelete : false,
         };
       });
 
@@ -177,7 +180,7 @@ exports.getAllUserRights = async (req, res) => {
         employeeName: employee.EmployeeName,
         employeeCode: employee.EmployeeCode,
         employeeRole: employee.employeeRole,
-        menus: menuTree
+        menus: menuTree,
       });
     }
 
@@ -194,7 +197,7 @@ exports.updateUserRights = async (req, res) => {
 
     if (!employeeId || !menus || !Array.isArray(menus)) {
       return res.status(400).json({
-        message: "employeeId and menus array are required."
+        message: "employeeId and menus array are required.",
       });
     }
 
@@ -204,9 +207,7 @@ exports.updateUserRights = async (req, res) => {
     const updatedData = {
       employeeId: employeeObjectId,
       menus: menus.map((menu) => ({
-        menuId: menu.menuId
-          ? new mongoose.Types.ObjectId(menu.menuId)
-          : null,
+        menuId: menu.menuId ? new mongoose.Types.ObjectId(menu.menuId) : null,
         formId: menu.formId,
         parentFormId: menu.parentFormId || null,
         title: menu.title,
@@ -215,7 +216,7 @@ exports.updateUserRights = async (req, res) => {
         isAdd: menu.isAdd ?? false,
         isEdit: menu.isEdit ?? false,
         isDelete: menu.isDelete ?? false,
-        isNotification: menu.isNotification ?? false
+        isNotification: menu.isNotification ?? false,
       })),
     };
 
@@ -223,11 +224,9 @@ exports.updateUserRights = async (req, res) => {
 
     if (_id) {
       // Update by document _id
-      result = await UserRights.findByIdAndUpdate(
-        _id,
-        updatedData,
-        { new: true }
-      );
+      result = await UserRights.findByIdAndUpdate(_id, updatedData, {
+        new: true,
+      });
 
       if (!result) {
         return res.status(404).json({
@@ -239,7 +238,7 @@ exports.updateUserRights = async (req, res) => {
       result = await UserRights.findOneAndUpdate(
         { employeeId: employeeObjectId },
         updatedData,
-        { upsert: true, new: true }
+        { upsert: true, new: true },
       );
     }
 
@@ -264,7 +263,7 @@ exports.deleteUserRight = async (req, res) => {
     }
 
     res.status(200).json({
-      message: "User right deleted successfully."
+      message: "User right deleted successfully.",
     });
   } catch (error) {
     console.error("Delete UserRights error:", error);
@@ -274,9 +273,9 @@ exports.deleteUserRight = async (req, res) => {
 
 exports.getAllMenus = async (req, res) => {
   try {
-    const {  } = req.body;
+    const {} = req.body;
     const menus = await MenuRegistry.find({
-      isActive: true
+      isActive: true,
     })
       .sort({ sortOrder: 1 })
       .lean();
@@ -287,7 +286,7 @@ exports.getAllMenus = async (req, res) => {
     }
 
     // Step 3 → Add parentTitle to each menu
-    menus.forEach(menu => {
+    menus.forEach((menu) => {
       menu.parentTitle = menu.parentFormId
         ? menuMap[menu.parentFormId]?.title || null
         : null;
@@ -297,20 +296,18 @@ exports.getAllMenus = async (req, res) => {
     const tree = buildMenuResponseTree(menus);
 
     return res.status(200).json(tree);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({
       message: "Error fetching menus",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 exports.getAllEmployees = async (req, res) => {
   try {
-    
-    const employees = await Employee.find({})
+    const employees = await Employee.find({});
 
     res.status(200).json(employees);
   } catch (error) {
@@ -321,9 +318,9 @@ exports.getAllEmployees = async (req, res) => {
 
 function buildMenuResponseTree(items, parentFormId = null) {
   return items
-    .filter(item => item.parentFormId === parentFormId)
+    .filter((item) => item.parentFormId === parentFormId)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(item => ({
+    .map((item) => ({
       menuId: item.menuId,
       title: item.title,
       formId: item.formId,
@@ -334,7 +331,6 @@ function buildMenuResponseTree(items, parentFormId = null) {
       isView: item.isView,
       isDelete: item.isDelete,
       isNotification: item.isNotification,
-      children: buildMenuResponseTree(items, item.formId)
+      children: buildMenuResponseTree(items, item.formId),
     }));
 }
-

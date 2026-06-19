@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const ProjectSchema = new mongoose.Schema(
   {
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Client",
+      // required: true,
+    },
     projectCode: {
       type: String,
       trim: true,
@@ -31,7 +36,7 @@ const ProjectSchema = new mongoose.Schema(
     },
     projectHead: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Employee"
+      ref: "Employee",
     },
     assignedEmployees: [
       {
@@ -44,7 +49,7 @@ const ProjectSchema = new mongoose.Schema(
       ref: "Employee",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Project", ProjectSchema);

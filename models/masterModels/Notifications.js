@@ -33,25 +33,30 @@ const notificationSchema = new mongoose.Schema(
         "group-chat-message",
         "announcement",
         "task-assignment",
+        "subtask-assignment",
         "task-complete",
         "holiday-notice",
+        "subtask-completed",
         "system-alert",
-        "other"
+        "other",
       ],
       default: "general",
     },
     status: {
       type: String,
-      enum: ["unseen", "seen","approved","rejected"],
+      enum: ["unseen", "seen", "approved", "rejected"],
       default: "unseen",
     },
     meta: {
       leaveRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "Leave" },
-      permissionRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "Permission" },
+      permissionRequestId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Permission",
+      },
       taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Notification", notificationSchema);

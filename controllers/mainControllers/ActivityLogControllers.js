@@ -27,7 +27,7 @@ exports.logCreate = async ({
   newValue,
   description,
   ipAddress,
-  userAgent
+  userAgent,
 }) => {
   const now = new Date();
 
@@ -60,10 +60,10 @@ exports.logCreate = async ({
     ipAddress,
     userAgent,
     timestamp: now,
-    dateStr: now.toISOString().split("T")[0],     // e.g. "2025-07-12"
-    monthStr: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, // e.g. "2025-07"
-    year: now.getFullYear()
-  })
+    dateStr: now.toISOString().split("T")[0],
+    monthStr: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    year: now.getFullYear(),
+  });
 };
 
 exports.logUpdate = async ({
@@ -75,7 +75,7 @@ exports.logUpdate = async ({
   oldValue,
   newValue,
   description,
-  extraFields = {}
+  extraFields = {},
 }) => {
   const now = new Date();
 
@@ -83,9 +83,10 @@ exports.logUpdate = async ({
   const monthStr = now.toISOString().slice(0, 7);
   const year = now.getFullYear();
 
-  const activityValue = (typeof oldValue === "number" && typeof newValue === "number")
-    ? newValue - oldValue
-    : null;
+  const activityValue =
+    typeof oldValue === "number" && typeof newValue === "number"
+      ? newValue - oldValue
+      : null;
 
   await ActivityLog.create({
     employeeId: req.user._id,
@@ -113,7 +114,7 @@ exports.logUpdate = async ({
     userAgent: req.headers["user-agent"],
     dateStr,
     monthStr,
-    year
+    year,
   });
 };
 
@@ -123,7 +124,7 @@ exports.logDelete = async ({
   entityCode,
   module,
   description,
-  extraFields = {}
+  extraFields = {},
 }) => {
   const now = new Date();
 
@@ -157,7 +158,7 @@ exports.logDelete = async ({
     userAgent: req.headers["user-agent"],
     dateStr,
     monthStr,
-    year
+    year,
   });
 };
 
@@ -172,22 +173,24 @@ exports.logCountChange = async ({
   description,
   parentProductId,
   mainParentId,
-  extraFields = {}
+  extraFields = {},
 }) => {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10);
   const monthStr = now.toISOString().slice(0, 7);
   const year = now.getFullYear();
 
-  const activityValue = (typeof oldValue === "number" && typeof newValue === "number")
-    ? Math.abs(newValue - oldValue)
-    : null;
+  const activityValue =
+    typeof oldValue === "number" && typeof newValue === "number"
+      ? Math.abs(newValue - oldValue)
+      : null;
 
-  const action = (newValue > oldValue)
-    ? "added"
-    : (newValue < oldValue)
-      ? "reduced"
-      : "no_change";
+  const action =
+    newValue > oldValue
+      ? "added"
+      : newValue < oldValue
+        ? "reduced"
+        : "no_change";
 
   await ActivityLog.create({
     employeeId: req.body.user.employeeId,
@@ -217,17 +220,20 @@ exports.logCountChange = async ({
     userAgent: req.headers["user-agent"],
     dateStr,
     monthStr,
-    year
+    year,
   });
 };
 
 exports.getAllLogs = async (req, res) => {
   try {
-    const {unitId} = req.body
-  const page = parseInt(req.body.page) || 1;
-  const limit = parseInt(req.body.limit) || 100;
-  const skip = (page - 1) * limit;
-    const logs = await ActivityLog.find({unitId:unitId}).sort({ createdAt: -1 }).skip(skip).limit(limit);
+    const { unitId } = req.body;
+    const page = parseInt(req.body.page) || 1;
+    const limit = parseInt(req.body.limit) || 100;
+    const skip = (page - 1) * limit;
+    const logs = await ActivityLog.find({ unitId: unitId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
     res.json(logs);
   } catch (err) {
     console.error(err);
@@ -270,11 +276,11 @@ exports.getFilteredLogs = async (req, res) => {
       startDate,
       endDate,
       page = 1,
-      limit = 20
+      limit = 20,
     } = req.body;
 
     const query = {};
- const parseDateString = (str) => {
+    const parseDateString = (str) => {
       if (!str) return null;
       const [day, month, year] = str.split("-");
       return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
@@ -350,9 +356,8 @@ exports.getFilteredLogs = async (req, res) => {
       total,
       page: parseInt(page),
       pages: Math.ceil(total / limit),
-      logs
+      logs,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error fetching logs." });
