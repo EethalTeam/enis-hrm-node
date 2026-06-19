@@ -328,7 +328,7 @@ const handleGroupChatMessage = async (
       console.error("⚠️ Fallback notify error:", fallbackErr.message);
     }
 
-    console.log(`✅ Message broadcast complete for group ${groupId}`);
+    console.log(` ✅ Message broadcast complete for group ${groupId}`);
   } catch (err) {
     console.error("❌ Error handling group chat message:", err.message);
   }
